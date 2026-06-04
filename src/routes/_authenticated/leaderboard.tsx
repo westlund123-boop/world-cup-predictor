@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
-import { getLeaderboard } from "@/lib/wc.functions";
+import { getCachedLeaderboard } from "@/lib/admin.functions";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -14,8 +14,8 @@ export const Route = createFileRoute("/_authenticated/leaderboard")({
 });
 
 function Leaderboard() {
-  const fn = useServerFn(getLeaderboard);
-  const { data: rows = [] } = useQuery({ queryKey: ["leaderboard"], queryFn: () => fn() });
+  const fn = useServerFn(getCachedLeaderboard);
+  const { data: rows = [] } = useQuery({ queryKey: ["leaderboard-cache"], queryFn: () => fn() });
 
   const [filter, setFilter] = useState("");
   const [dept, setDept] = useState("");
