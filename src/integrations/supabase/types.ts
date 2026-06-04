@@ -14,6 +14,56 @@ export type Database = {
   }
   public: {
     Tables: {
+      leaderboard_cache: {
+        Row: {
+          exact_count: number
+          goalscorer_points: number
+          knockout_points: number
+          match_points: number
+          onextwo_count: number
+          predictions_made: number
+          top3_points: number
+          top3_submitted_at: string | null
+          total: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          exact_count?: number
+          goalscorer_points?: number
+          knockout_points?: number
+          match_points?: number
+          onextwo_count?: number
+          predictions_made?: number
+          top3_points?: number
+          top3_submitted_at?: string | null
+          total?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          exact_count?: number
+          goalscorer_points?: number
+          knockout_points?: number
+          match_points?: number
+          onextwo_count?: number
+          predictions_made?: number
+          top3_points?: number
+          top3_submitted_at?: string | null
+          total?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leaderboard_cache_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       match_goalscorers: {
         Row: {
           id: string
@@ -56,39 +106,54 @@ export type Database = {
       matches: {
         Row: {
           away_score: number | null
+          away_source_code: string | null
           away_team_id: string | null
+          bracket_code: string | null
           created_at: string
+          finished_at: string | null
           group_letter: string | null
           home_score: number | null
+          home_source_code: string | null
           home_team_id: string | null
           id: string
           kickoff_at: string
           stage: Database["public"]["Enums"]["match_stage"]
           status: Database["public"]["Enums"]["match_status"]
+          winner_team_id: string | null
         }
         Insert: {
           away_score?: number | null
+          away_source_code?: string | null
           away_team_id?: string | null
+          bracket_code?: string | null
           created_at?: string
+          finished_at?: string | null
           group_letter?: string | null
           home_score?: number | null
+          home_source_code?: string | null
           home_team_id?: string | null
           id?: string
           kickoff_at: string
           stage: Database["public"]["Enums"]["match_stage"]
           status?: Database["public"]["Enums"]["match_status"]
+          winner_team_id?: string | null
         }
         Update: {
           away_score?: number | null
+          away_source_code?: string | null
           away_team_id?: string | null
+          bracket_code?: string | null
           created_at?: string
+          finished_at?: string | null
           group_letter?: string | null
           home_score?: number | null
+          home_source_code?: string | null
           home_team_id?: string | null
           id?: string
           kickoff_at?: string
           stage?: Database["public"]["Enums"]["match_stage"]
           status?: Database["public"]["Enums"]["match_status"]
+          winner_team_id?: string | null
         }
         Relationships: [
           {
@@ -101,6 +166,13 @@ export type Database = {
           {
             foreignKeyName: "matches_home_team_id_fkey"
             columns: ["home_team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "matches_winner_team_id_fkey"
+            columns: ["winner_team_id"]
             isOneToOne: false
             referencedRelation: "teams"
             referencedColumns: ["id"]
