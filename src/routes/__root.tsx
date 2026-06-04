@@ -118,8 +118,29 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <AuthInvalidator />
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
     </QueryClientProvider>
   );
 }
+
+function AuthInvalidator() {
+  const router = useRouter();
+  useEffect(() => {
+    let active = true;
+    import("@/integrations/supabase/client").then(({ supabase }) => {
+      if (!active) return;
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+        router.invalidate();
+      });
+      (AuthInvalidator as any)._unsub = () => subscription.unsubscribe();
+    });
+    return () => {
+      active = false;
+      (AuthInvalidator as any)._unsub?.();
+    };
+  }, [router]);
+  return null;
+}
+
