@@ -15,6 +15,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedTop3RouteImport } from './routes/_authenticated/top3'
 import { Route as AuthenticatedMatchesRouteImport } from './routes/_authenticated/matches'
+import { Route as AuthenticatedLeaderboardRouteImport } from './routes/_authenticated/leaderboard'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 
 const RulesRoute = RulesRouteImport.update({
@@ -46,6 +47,12 @@ const AuthenticatedMatchesRoute = AuthenticatedMatchesRouteImport.update({
   path: '/matches',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedLeaderboardRoute =
+  AuthenticatedLeaderboardRouteImport.update({
+    id: '/leaderboard',
+    path: '/leaderboard',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -57,6 +64,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/rules': typeof RulesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/leaderboard': typeof AuthenticatedLeaderboardRoute
   '/matches': typeof AuthenticatedMatchesRoute
   '/top3': typeof AuthenticatedTop3Route
 }
@@ -65,6 +73,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/rules': typeof RulesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/leaderboard': typeof AuthenticatedLeaderboardRoute
   '/matches': typeof AuthenticatedMatchesRoute
   '/top3': typeof AuthenticatedTop3Route
 }
@@ -75,14 +84,29 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/rules': typeof RulesRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/leaderboard': typeof AuthenticatedLeaderboardRoute
   '/_authenticated/matches': typeof AuthenticatedMatchesRoute
   '/_authenticated/top3': typeof AuthenticatedTop3Route
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/rules' | '/dashboard' | '/matches' | '/top3'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/rules'
+    | '/dashboard'
+    | '/leaderboard'
+    | '/matches'
+    | '/top3'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/rules' | '/dashboard' | '/matches' | '/top3'
+  to:
+    | '/'
+    | '/auth'
+    | '/rules'
+    | '/dashboard'
+    | '/leaderboard'
+    | '/matches'
+    | '/top3'
   id:
     | '__root__'
     | '/'
@@ -90,6 +114,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/rules'
     | '/_authenticated/dashboard'
+    | '/_authenticated/leaderboard'
     | '/_authenticated/matches'
     | '/_authenticated/top3'
   fileRoutesById: FileRoutesById
@@ -145,6 +170,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMatchesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/leaderboard': {
+      id: '/_authenticated/leaderboard'
+      path: '/leaderboard'
+      fullPath: '/leaderboard'
+      preLoaderRoute: typeof AuthenticatedLeaderboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -157,12 +189,14 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedLeaderboardRoute: typeof AuthenticatedLeaderboardRoute
   AuthenticatedMatchesRoute: typeof AuthenticatedMatchesRoute
   AuthenticatedTop3Route: typeof AuthenticatedTop3Route
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedLeaderboardRoute: AuthenticatedLeaderboardRoute,
   AuthenticatedMatchesRoute: AuthenticatedMatchesRoute,
   AuthenticatedTop3Route: AuthenticatedTop3Route,
 }
