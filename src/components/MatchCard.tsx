@@ -15,7 +15,8 @@ import { Lock, CheckCircle2, Clock } from "lucide-react";
 type Team = { id: string; name: string; code: string; flag_emoji: string | null; group_letter: string | null };
 type Match = {
   id: string; stage: string; group_letter: string | null; kickoff_at: string; status: string;
-  home_score: number | null; away_score: number | null; home_team_id: string; away_team_id: string;
+  home_score: number | null; away_score: number | null;
+  home_team_id: string | null; away_team_id: string | null;
 };
 type Player = { id: string; team_id: string; name: string; position: string | null };
 type Prediction = {
