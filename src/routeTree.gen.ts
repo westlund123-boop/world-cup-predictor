@@ -18,6 +18,7 @@ import { Route as AuthenticatedMatchesRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedLeaderboardRouteImport } from './routes/_authenticated/leaderboard'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedBracketRouteImport } from './routes/_authenticated/bracket'
+import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 
 const RulesRoute = RulesRouteImport.update({
   id: '/rules',
@@ -64,11 +65,17 @@ const AuthenticatedBracketRoute = AuthenticatedBracketRouteImport.update({
   path: '/bracket',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/rules': typeof RulesRoute
+  '/admin': typeof AuthenticatedAdminRoute
   '/bracket': typeof AuthenticatedBracketRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/leaderboard': typeof AuthenticatedLeaderboardRoute
@@ -79,6 +86,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/rules': typeof RulesRoute
+  '/admin': typeof AuthenticatedAdminRoute
   '/bracket': typeof AuthenticatedBracketRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/leaderboard': typeof AuthenticatedLeaderboardRoute
@@ -91,6 +99,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/rules': typeof RulesRoute
+  '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/bracket': typeof AuthenticatedBracketRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/leaderboard': typeof AuthenticatedLeaderboardRoute
@@ -103,6 +112,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/rules'
+    | '/admin'
     | '/bracket'
     | '/dashboard'
     | '/leaderboard'
@@ -113,6 +123,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/rules'
+    | '/admin'
     | '/bracket'
     | '/dashboard'
     | '/leaderboard'
@@ -124,6 +135,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/rules'
+    | '/_authenticated/admin'
     | '/_authenticated/bracket'
     | '/_authenticated/dashboard'
     | '/_authenticated/leaderboard'
@@ -203,10 +215,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedBracketRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedBracketRoute: typeof AuthenticatedBracketRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedLeaderboardRoute: typeof AuthenticatedLeaderboardRoute
@@ -215,6 +235,7 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedBracketRoute: AuthenticatedBracketRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedLeaderboardRoute: AuthenticatedLeaderboardRoute,
