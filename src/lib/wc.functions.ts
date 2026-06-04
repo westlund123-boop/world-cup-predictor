@@ -20,7 +20,7 @@ export const getMatches = createServerFn({ method: "GET" }).handler(async () => 
   const { data, error } = await supabaseAdmin
     .from("matches")
     .select(
-      "id,stage,group_letter,kickoff_at,status,home_score,away_score,home_team_id,away_team_id"
+      "id,stage,group_letter,kickoff_at,status,home_score,away_score,home_team_id,away_team_id,bracket_code,home_source_code,away_source_code,winner_team_id"
     )
     .order("kickoff_at");
   if (error) throw new Error(error.message);
