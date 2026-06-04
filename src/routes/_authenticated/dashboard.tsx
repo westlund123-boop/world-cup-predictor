@@ -73,8 +73,8 @@ function Dashboard() {
           ) : (
             <div className="space-y-3">
               {upcoming.map((m) => {
-                const home = teamMap.get(m.home_team_id);
-                const away = teamMap.get(m.away_team_id);
+                const home = m.home_team_id ? teamMap.get(m.home_team_id) : undefined;
+                const away = m.away_team_id ? teamMap.get(m.away_team_id) : undefined;
                 const has = predMap.has(m.id);
                 return (
                   <Link to="/matches" key={m.id}>
