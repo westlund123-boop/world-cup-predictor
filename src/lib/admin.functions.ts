@@ -54,7 +54,11 @@ export const adminEditMatch = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const patch: Record<string, unknown> = {};
+    const patch: {
+      kickoff_at?: string;
+      home_team_id?: string | null;
+      away_team_id?: string | null;
+    } = {};
     if (data.kickoff_at) patch.kickoff_at = data.kickoff_at;
     if (data.home_team_id !== undefined) patch.home_team_id = data.home_team_id;
     if (data.away_team_id !== undefined) patch.away_team_id = data.away_team_id;
