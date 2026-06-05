@@ -152,28 +152,30 @@ export function MatchCard({
 
         <div>
           <Label className="text-xs uppercase tracking-wider text-muted-foreground">First goalscorer (+4 pts)</Label>
-          <select
+          <PlayerCombobox
             disabled={locked}
-            value={firstScorer ?? ""}
-            onChange={(e) => onChange(setFirstScorer)(e.target.value || null)}
-            className="mt-1.5 w-full h-9 px-3 rounded-md border border-input bg-background text-sm disabled:opacity-60"
-          >
-            <option value="">No prediction</option>
-            <optgroup label={home.name}>
-              {homeSquad.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.position})</option>)}
-            </optgroup>
-            <optgroup label={away.name}>
-              {awaySquad.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.position})</option>)}
-            </optgroup>
-          </select>
+            value={firstScorer}
+            onChange={(v) => onChange(setFirstScorer)(v)}
+            home={home}
+            away={away}
+            homeSquad={homeSquad}
+            awaySquad={awaySquad}
+            placeholder="Pick first scorer…"
+          />
         </div>
 
         <div className="space-y-2">
           <Label className="text-xs uppercase tracking-wider text-muted-foreground">Other goalscorers (2 pts each, max 8)</Label>
-          <div className="grid grid-cols-2 gap-3 max-h-44 overflow-y-auto pr-1">
-            <ScorerCol title={home.name} players={homeSquad} selected={scorers} setSelected={onChange(setScorers)} disabled={locked} excludeId={firstScorer} />
-            <ScorerCol title={away.name} players={awaySquad} selected={scorers} setSelected={onChange(setScorers)} disabled={locked} excludeId={firstScorer} />
-          </div>
+          <ScorerMultiSelect
+            disabled={locked}
+            selected={scorers}
+            setSelected={onChange(setScorers)}
+            home={home}
+            away={away}
+            homeSquad={homeSquad}
+            awaySquad={awaySquad}
+            excludeId={firstScorer}
+          />
         </div>
 
         {status === "finished" && prediction && (
