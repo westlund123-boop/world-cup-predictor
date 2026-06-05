@@ -404,6 +404,7 @@ function ResultDialog({
   const [status, setStatus] = useState<"scheduled" | "live" | "finished">(match.status);
   const [firstScorer, setFirstScorer] = useState<string>(existing?.first ?? "");
   const [scorers, setScorers] = useState<string[]>(existing?.all ?? []);
+  const [winner, setWinner] = useState<string>(match.winner_team_id ?? "");
 
   if (!home || !away) {
     return (
@@ -425,19 +426,27 @@ function ResultDialog({
 
   const homeSquad = players.filter((p: any) => p.team_id === home.id);
   const awaySquad = players.filter((p: any) => p.team_id === away.id);
+  const isKO = match.stage !== "group";
+  const isTied = hs === as_;
+  const needsWinner = status === "finished" && isKO && isTied;
   const fn = useServerFn(adminSaveResult);
   const save = useMutation({
-    mutationFn: () =>
-      fn({
+    mutationFn: () => {
+      // Ensure first scorer is included in scorers list (client-side mirror of server rule)
+      const allScorers =
+        firstScorer && !scorers.includes(firstScorer) ? [firstScorer, ...scorers] : scorers;
+      return fn({
         data: {
           match_id: match.id,
           home_score: hs,
           away_score: as_,
           status,
+          winner_team_id: winner || null,
           first_scorer_player_id: firstScorer || null,
-          scorer_player_ids: scorers.filter((x) => x !== firstScorer),
+          scorer_player_ids: allScorers.filter((x) => x !== firstScorer),
         },
-      }),
+      });
+    },
     onSuccess: () => {
       toast.success("Result saved");
       onSaved();
