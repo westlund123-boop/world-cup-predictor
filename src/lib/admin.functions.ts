@@ -444,7 +444,17 @@ export const adminExportLeaderboardCSV = createServerFn({ method: "POST" })
       department: pMap.get(c.user_id)?.department ?? "",
       email: emailMap.get(c.user_id) ?? "",
     }));
-    rows.sort((a: any, b: any) => b.total - a.total);
+    // Same tie-breakers as getCachedLeaderboard
+    rows.sort((a: any, b: any) => {
+      if (b.total !== a.total) return b.total - a.total;
+      if (b.exact_count !== a.exact_count) return b.exact_count - a.exact_count;
+      if (b.onextwo_count !== a.onextwo_count) return b.onextwo_count - a.onextwo_count;
+      if (b.goalscorer_points !== a.goalscorer_points)
+        return b.goalscorer_points - a.goalscorer_points;
+      const at = a.top3_submitted_at ? new Date(a.top3_submitted_at).getTime() : Infinity;
+      const bt = b.top3_submitted_at ? new Date(b.top3_submitted_at).getTime() : Infinity;
+      return at - bt;
+    });
 
     const header = [
       "Rank",
