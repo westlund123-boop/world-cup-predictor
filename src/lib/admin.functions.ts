@@ -356,8 +356,8 @@ export const adminRecalculate = createServerFn({ method: "POST" })
       await supabaseAdmin.from("top3_predictions").update({ points: u.points }).eq("user_id", u.user_id);
     }
 
-    // Rebuild leaderboard_cache fully (idempotent)
-    await supabaseAdmin.from("leaderboard_cache").delete().neq("user_id", "00000000-0000-0000-0000-000000000000");
+    // Rebuild leaderboard_cache via upsert by user_id (PK).
+    // Safer than delete-then-insert: stays consistent on partial failure.
     const rows = [...totals.entries()].map(([user_id, v]) => ({
       user_id,
       total: v.match_points + v.goalscorer_points + v.knockout_points + v.top3_points,
@@ -367,13 +367,25 @@ export const adminRecalculate = createServerFn({ method: "POST" })
       top3_points: v.top3_points,
       exact_count: v.exact_count,
       onextwo_count: v.onextwo_count,
+      // predictions_made = total submitted predictions (all stages, including unfinished).
       predictions_made: v.predictions_made,
       top3_submitted_at: v.top3_submitted_at,
       updated_at: new Date().toISOString(),
     }));
     if (rows.length > 0) {
-      const { error } = await supabaseAdmin.from("leaderboard_cache").insert(rows);
-      if (error) throw new Error(error.message);
+      const { error: upErr } = await supabaseAdmin
+        .from("leaderboard_cache")
+        .upsert(rows, { onConflict: "user_id" });
+      if (upErr) throw new Error(`Leaderboard upsert failed: ${upErr.message}`);
+    }
+    // Remove stale cache rows for users that no longer have a profile
+    const keepIds = rows.map((r) => r.user_id);
+    if (keepIds.length > 0) {
+      const { error: delErr } = await supabaseAdmin
+        .from("leaderboard_cache")
+        .delete()
+        .not("user_id", "in", `(${keepIds.map((id) => `"${id}"`).join(",")})`);
+      if (delErr) throw new Error(`Leaderboard cleanup failed: ${delErr.message}`);
     }
 
     return { ok: true, users: rows.length, finished_matches: finished.length };
