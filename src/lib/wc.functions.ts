@@ -31,7 +31,9 @@ export const getPlayers = createServerFn({ method: "GET" }).handler(async () => 
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin
     .from("players")
-    .select("id,team_id,name,position")
+    .select("id,team_id,name,name_on_shirt,position,shirt_number,club,active")
+    .eq("active", true)
+    .order("shirt_number", { ascending: true, nullsFirst: false })
     .order("name");
   if (error) throw new Error(error.message);
   return data ?? [];

@@ -35,13 +35,22 @@ export function AppHeader({ isAdmin }: { isAdmin?: boolean }) {
             </Link>
           ))}
           {isAdmin && (
-            <Link
-              to="/admin"
-              className="px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-              activeProps={{ className: "text-primary bg-accent" }}
-            >
-              Admin
-            </Link>
+            <>
+              <Link
+                to="/admin"
+                className="px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                activeProps={{ className: "text-primary bg-accent" }}
+              >
+                Admin
+              </Link>
+              <Link
+                to="/squads"
+                className="px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                activeProps={{ className: "text-primary bg-accent" }}
+              >
+                Squads
+              </Link>
+            </>
           )}
         </nav>
         <Button
@@ -67,13 +76,22 @@ export function AppHeader({ isAdmin }: { isAdmin?: boolean }) {
           </Link>
         ))}
         {isAdmin && (
-          <Link
-            to="/admin"
-            className="px-3 py-1.5 rounded-md text-xs font-medium text-muted-foreground whitespace-nowrap"
-            activeProps={{ className: "text-primary bg-accent" }}
-          >
-            Admin
-          </Link>
+          <>
+            <Link
+              to="/admin"
+              className="px-3 py-1.5 rounded-md text-xs font-medium text-muted-foreground whitespace-nowrap"
+              activeProps={{ className: "text-primary bg-accent" }}
+            >
+              Admin
+            </Link>
+            <Link
+              to="/squads"
+              className="px-3 py-1.5 rounded-md text-xs font-medium text-muted-foreground whitespace-nowrap"
+              activeProps={{ className: "text-primary bg-accent" }}
+            >
+              Squads
+            </Link>
+          </>
         )}
       </nav>
     </header>

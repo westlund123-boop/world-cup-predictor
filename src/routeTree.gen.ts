@@ -14,6 +14,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedTop3RouteImport } from './routes/_authenticated/top3'
+import { Route as AuthenticatedSquadsRouteImport } from './routes/_authenticated/squads'
 import { Route as AuthenticatedMyPredictionsRouteImport } from './routes/_authenticated/my-predictions'
 import { Route as AuthenticatedMatchesRouteImport } from './routes/_authenticated/matches'
 import { Route as AuthenticatedLeaderboardRouteImport } from './routes/_authenticated/leaderboard'
@@ -43,6 +44,11 @@ const IndexRoute = IndexRouteImport.update({
 const AuthenticatedTop3Route = AuthenticatedTop3RouteImport.update({
   id: '/top3',
   path: '/top3',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedSquadsRoute = AuthenticatedSquadsRouteImport.update({
+  id: '/squads',
+  path: '/squads',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedMyPredictionsRoute =
@@ -88,6 +94,7 @@ export interface FileRoutesByFullPath {
   '/leaderboard': typeof AuthenticatedLeaderboardRoute
   '/matches': typeof AuthenticatedMatchesRoute
   '/my-predictions': typeof AuthenticatedMyPredictionsRoute
+  '/squads': typeof AuthenticatedSquadsRoute
   '/top3': typeof AuthenticatedTop3Route
 }
 export interface FileRoutesByTo {
@@ -100,6 +107,7 @@ export interface FileRoutesByTo {
   '/leaderboard': typeof AuthenticatedLeaderboardRoute
   '/matches': typeof AuthenticatedMatchesRoute
   '/my-predictions': typeof AuthenticatedMyPredictionsRoute
+  '/squads': typeof AuthenticatedSquadsRoute
   '/top3': typeof AuthenticatedTop3Route
 }
 export interface FileRoutesById {
@@ -114,6 +122,7 @@ export interface FileRoutesById {
   '/_authenticated/leaderboard': typeof AuthenticatedLeaderboardRoute
   '/_authenticated/matches': typeof AuthenticatedMatchesRoute
   '/_authenticated/my-predictions': typeof AuthenticatedMyPredictionsRoute
+  '/_authenticated/squads': typeof AuthenticatedSquadsRoute
   '/_authenticated/top3': typeof AuthenticatedTop3Route
 }
 export interface FileRouteTypes {
@@ -128,6 +137,7 @@ export interface FileRouteTypes {
     | '/leaderboard'
     | '/matches'
     | '/my-predictions'
+    | '/squads'
     | '/top3'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -140,6 +150,7 @@ export interface FileRouteTypes {
     | '/leaderboard'
     | '/matches'
     | '/my-predictions'
+    | '/squads'
     | '/top3'
   id:
     | '__root__'
@@ -153,6 +164,7 @@ export interface FileRouteTypes {
     | '/_authenticated/leaderboard'
     | '/_authenticated/matches'
     | '/_authenticated/my-predictions'
+    | '/_authenticated/squads'
     | '/_authenticated/top3'
   fileRoutesById: FileRoutesById
 }
@@ -198,6 +210,13 @@ declare module '@tanstack/react-router' {
       path: '/top3'
       fullPath: '/top3'
       preLoaderRoute: typeof AuthenticatedTop3RouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/squads': {
+      id: '/_authenticated/squads'
+      path: '/squads'
+      fullPath: '/squads'
+      preLoaderRoute: typeof AuthenticatedSquadsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/my-predictions': {
@@ -252,6 +271,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedLeaderboardRoute: typeof AuthenticatedLeaderboardRoute
   AuthenticatedMatchesRoute: typeof AuthenticatedMatchesRoute
   AuthenticatedMyPredictionsRoute: typeof AuthenticatedMyPredictionsRoute
+  AuthenticatedSquadsRoute: typeof AuthenticatedSquadsRoute
   AuthenticatedTop3Route: typeof AuthenticatedTop3Route
 }
 
@@ -262,6 +282,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedLeaderboardRoute: AuthenticatedLeaderboardRoute,
   AuthenticatedMatchesRoute: AuthenticatedMatchesRoute,
   AuthenticatedMyPredictionsRoute: AuthenticatedMyPredictionsRoute,
+  AuthenticatedSquadsRoute: AuthenticatedSquadsRoute,
   AuthenticatedTop3Route: AuthenticatedTop3Route,
 }
 
@@ -277,13 +298,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
