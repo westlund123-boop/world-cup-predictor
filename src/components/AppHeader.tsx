@@ -8,6 +8,7 @@ export function AppHeader({ isAdmin }: { isAdmin?: boolean }) {
   const links = [
     { to: "/dashboard", label: "Dashboard" },
     { to: "/matches", label: "Matches" },
+    { to: "/my-predictions", label: "My Predictions" },
     { to: "/bracket", label: "Bracket" },
     { to: "/top3", label: "Top 3" },
     { to: "/leaderboard", label: "Leaderboard" },

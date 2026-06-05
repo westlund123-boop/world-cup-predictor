@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { upsertPrediction } from "@/lib/wc.functions";
 import { matchStatus, STAGE_LABEL } from "@/lib/scoring";
 import { toast } from "sonner";
-import { Lock, CheckCircle2, Clock } from "lucide-react";
+import { Lock, CheckCircle2, Clock, Pencil, CircleDashed, Radio } from "lucide-react";
 
 type Team = { id: string; name: string; code: string; flag_emoji: string | null; group_letter: string | null };
 type Match = {
@@ -24,6 +24,8 @@ type Prediction = {
   first_scorer_player_id: string | null; points: number;
 };
 
+type PState = "not_predicted" | "saved" | "editing" | "locked" | "live" | "finished";
+
 export function MatchCard({
   match, home, away, players, prediction, scorerIds,
 }: {
@@ -32,13 +34,13 @@ export function MatchCard({
 }) {
   const status = matchStatus(match.kickoff_at, match.status);
   const locked = status !== "open";
-  const finished = status === "finished";
 
   const [outcome, setOutcome] = useState<"1" | "X" | "2">((prediction?.outcome as any) ?? "1");
   const [hs, setHs] = useState<number>(prediction?.home_score ?? 1);
   const [as_, setAs] = useState<number>(prediction?.away_score ?? 0);
   const [firstScorer, setFirstScorer] = useState<string | null>(prediction?.first_scorer_player_id ?? null);
   const [scorers, setScorers] = useState<string[]>(scorerIds);
+  const [dirty, setDirty] = useState(false);
 
   const homeSquad = players.filter((p) => p.team_id === home.id);
   const awaySquad = players.filter((p) => p.team_id === away.id);
@@ -58,35 +60,52 @@ export function MatchCard({
         },
       }),
     onSuccess: () => {
-      toast.success("Prediction saved");
+      toast.success("Prediction saved", { description: `${home.name} vs ${away.name}` });
+      setDirty(false);
       qc.invalidateQueries({ queryKey: ["myPredictions"] });
-      qc.invalidateQueries({ queryKey: ["leaderboard"] });
+      qc.invalidateQueries({ queryKey: ["leaderboard-cache"] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error("Could not save prediction", { description: e.message }),
   });
+
+  // Live clock refresh so "locked at kickoff" hits as soon as time passes
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (locked) return;
+    const id = setInterval(() => setTick((n) => n + 1), 30_000);
+    return () => clearInterval(id);
+  }, [locked]);
+
+  const pState: PState =
+    status === "finished" ? "finished"
+    : status === "locked" ? (match.status === "live" ? "live" : "locked")
+    : prediction ? (dirty ? "editing" : "saved")
+    : "not_predicted";
 
   const kickoff = useMemo(() => new Date(match.kickoff_at), [match.kickoff_at]);
 
+  const onChange = <T,>(setter: (v: T) => void) => (v: T) => { setter(v); setDirty(true); };
+
   return (
     <Card className="overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-3 bg-muted/40 border-b border-border text-xs">
-        <div className="flex items-center gap-2">
-          <Badge variant="outline" className="font-normal">
+      <div className="flex items-center justify-between px-5 py-3 bg-muted/40 border-b border-border text-xs gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <Badge variant="outline" className="font-normal whitespace-nowrap">
             {STAGE_LABEL[match.stage] ?? match.stage}
-            {match.group_letter ? ` · Group ${match.group_letter}` : ""}
+            {match.group_letter ? ` · ${match.group_letter}` : ""}
           </Badge>
-          <span className="text-muted-foreground">
+          <span className="text-muted-foreground truncate">
             {kickoff.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
           </span>
         </div>
-        <StatusBadge status={status} />
+        <PredictionStateBadge state={pState} />
       </div>
 
       <div className="p-5 space-y-5">
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
           <TeamSide team={home} align="right" />
           <div className="text-center">
-            {finished ? (
+            {status === "finished" ? (
               <div className="font-mono font-bold text-2xl">
                 {match.home_score} – {match.away_score}
               </div>
@@ -97,12 +116,23 @@ export function MatchCard({
           <TeamSide team={away} align="left" />
         </div>
 
+        {locked && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-muted text-xs text-muted-foreground">
+            <Lock className="h-3.5 w-3.5" />
+            {status === "finished"
+              ? "Match finished — your prediction is final."
+              : match.status === "live"
+              ? "Match in progress — predictions are locked."
+              : "This match has already started, predictions are locked."}
+          </div>
+        )}
+
         <div className="grid grid-cols-3 gap-1 p-1 bg-muted rounded-md">
           {(["1", "X", "2"] as const).map((opt) => (
             <button
               key={opt}
               disabled={locked}
-              onClick={() => setOutcome(opt)}
+              onClick={() => onChange(setOutcome)(opt)}
               className={`py-2 rounded text-sm font-semibold transition-colors ${
                 outcome === opt ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
               } disabled:opacity-60 disabled:cursor-not-allowed`}
@@ -113,9 +143,9 @@ export function MatchCard({
         </div>
 
         <div className="flex items-center justify-center gap-3">
-          <ScoreInput value={hs} onChange={setHs} disabled={locked} label={home.code} />
+          <ScoreInput value={hs} onChange={onChange(setHs)} disabled={locked} label={home.code} />
           <span className="text-xl text-muted-foreground font-mono">–</span>
-          <ScoreInput value={as_} onChange={setAs} disabled={locked} label={away.code} />
+          <ScoreInput value={as_} onChange={onChange(setAs)} disabled={locked} label={away.code} />
         </div>
 
         <div>
@@ -123,7 +153,7 @@ export function MatchCard({
           <select
             disabled={locked}
             value={firstScorer ?? ""}
-            onChange={(e) => setFirstScorer(e.target.value || null)}
+            onChange={(e) => onChange(setFirstScorer)(e.target.value || null)}
             className="mt-1.5 w-full h-9 px-3 rounded-md border border-input bg-background text-sm disabled:opacity-60"
           >
             <option value="">No prediction</option>
@@ -137,31 +167,52 @@ export function MatchCard({
         </div>
 
         <div className="space-y-2">
-          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Other goalscorers (2 pts each)</Label>
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Other goalscorers (2 pts each, max 8)</Label>
           <div className="grid grid-cols-2 gap-3 max-h-44 overflow-y-auto pr-1">
-            <ScorerCol title={home.name} players={homeSquad} selected={scorers} setSelected={setScorers} disabled={locked} excludeId={firstScorer} />
-            <ScorerCol title={away.name} players={awaySquad} selected={scorers} setSelected={setScorers} disabled={locked} excludeId={firstScorer} />
+            <ScorerCol title={home.name} players={homeSquad} selected={scorers} setSelected={onChange(setScorers)} disabled={locked} excludeId={firstScorer} />
+            <ScorerCol title={away.name} players={awaySquad} selected={scorers} setSelected={onChange(setScorers)} disabled={locked} excludeId={firstScorer} />
           </div>
         </div>
 
-        {finished && prediction && (
+        {status === "finished" && prediction && (
           <div className="text-center py-2 rounded-md bg-accent text-accent-foreground font-semibold">
             You earned {prediction.points} pts
           </div>
         )}
 
-        <Button onClick={() => save.mutate()} disabled={locked || save.isPending} className="w-full">
-          {locked ? "Locked" : save.isPending ? "Saving…" : prediction ? "Update prediction" : "Save prediction"}
-        </Button>
+        {!locked && (
+          <Button
+            onClick={() => save.mutate()}
+            disabled={save.isPending || (!dirty && !!prediction)}
+            className="w-full"
+          >
+            {save.isPending
+              ? "Saving…"
+              : prediction
+              ? dirty ? "Update prediction" : "Saved"
+              : "Save prediction"}
+          </Button>
+        )}
       </div>
     </Card>
   );
 }
 
-function StatusBadge({ status }: { status: "open" | "locked" | "finished" }) {
-  if (status === "open") return <span className="inline-flex items-center gap-1 text-primary font-medium"><Clock className="h-3 w-3" />Open</span>;
-  if (status === "locked") return <span className="inline-flex items-center gap-1 text-muted-foreground font-medium"><Lock className="h-3 w-3" />Locked</span>;
-  return <span className="inline-flex items-center gap-1 text-foreground font-medium"><CheckCircle2 className="h-3 w-3" />Finished</span>;
+function PredictionStateBadge({ state }: { state: PState }) {
+  const map = {
+    not_predicted: { icon: CircleDashed, label: "Not predicted", cls: "text-muted-foreground" },
+    saved:         { icon: CheckCircle2, label: "Saved",         cls: "text-primary" },
+    editing:       { icon: Pencil,       label: "Unsaved edits", cls: "text-amber-600" },
+    locked:        { icon: Lock,         label: "Locked",        cls: "text-muted-foreground" },
+    live:          { icon: Radio,        label: "Live",          cls: "text-destructive" },
+    finished:      { icon: CheckCircle2, label: "Finished",      cls: "text-foreground" },
+  } as const;
+  const { icon: Icon, label, cls } = map[state];
+  return (
+    <span className={`inline-flex items-center gap-1 font-medium whitespace-nowrap ${cls}`}>
+      <Icon className="h-3 w-3" />{label}
+    </span>
+  );
 }
 
 function TeamSide({ team, align }: { team: Team; align: "left" | "right" }) {
