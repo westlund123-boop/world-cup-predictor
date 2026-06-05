@@ -248,33 +248,185 @@ function ScoreInput({ value, onChange, disabled, label }: { value: number; onCha
   );
 }
 
-function ScorerCol({
-  title, players, selected, setSelected, disabled, excludeId,
+function formatPlayer(p: Player, teamCode: string) {
+  const num = p.shirt_number != null ? `#${p.shirt_number} ` : "";
+  const pos = p.position ? ` · ${p.position}` : "";
+  return `${num}${p.name}${pos} · ${teamCode}`;
+}
+
+function PlayerCombobox({
+  value, onChange, disabled, home, away, homeSquad, awaySquad, placeholder,
 }: {
-  title: string; players: Player[]; selected: string[]; setSelected: (v: string[]) => void;
-  disabled: boolean; excludeId: string | null;
+  value: string | null;
+  onChange: (v: string | null) => void;
+  disabled: boolean;
+  home: Team; away: Team;
+  homeSquad: Player[]; awaySquad: Player[];
+  placeholder: string;
 }) {
+  const [open, setOpen] = useState(false);
+  const all = useMemo(() => [
+    ...homeSquad.map((p) => ({ p, team: home })),
+    ...awaySquad.map((p) => ({ p, team: away })),
+  ], [homeSquad, awaySquad, home, away]);
+  const selected = all.find((x) => x.p.id === value);
+
   return (
-    <div>
-      <div className="text-xs font-semibold mb-1.5">{title}</div>
-      <div className="space-y-1">
-        {players.filter((p) => p.id !== excludeId).map((p) => {
-          const checked = selected.includes(p.id);
-          return (
-            <label key={p.id} className="flex items-center gap-2 text-xs">
-              <Checkbox
-                checked={checked}
-                disabled={disabled}
-                onCheckedChange={(v) => {
-                  if (v) setSelected([...selected, p.id]);
-                  else setSelected(selected.filter((x) => x !== p.id));
-                }}
-              />
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          role="combobox"
+          disabled={disabled}
+          className="mt-1.5 w-full justify-between font-normal h-9 text-sm"
+        >
+          <span className="truncate">
+            {selected ? (
+              <>
+                <span className="text-base mr-1.5">{selected.team.flag_emoji}</span>
+                {formatPlayer(selected.p, selected.team.code)}
+              </>
+            ) : (
+              <span className="text-muted-foreground">{placeholder}</span>
+            )}
+          </span>
+          <ChevronsUpDown className="h-3.5 w-3.5 opacity-50 shrink-0" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Search player or number…" />
+          <CommandList className="max-h-64">
+            <CommandEmpty>No players found.</CommandEmpty>
+            {value && (
+              <CommandGroup>
+                <CommandItem
+                  value="__clear__"
+                  onSelect={() => { onChange(null); setOpen(false); }}
+                  className="text-muted-foreground"
+                >
+                  <X className="h-3.5 w-3.5 mr-2" /> Clear selection
+                </CommandItem>
+              </CommandGroup>
+            )}
+            {[{ team: home, squad: homeSquad }, { team: away, squad: awaySquad }].map(({ team, squad }) => (
+              <CommandGroup key={team.id} heading={`${team.flag_emoji ?? ""} ${team.name}`}>
+                {squad.map((p) => (
+                  <CommandItem
+                    key={p.id}
+                    value={`${p.shirt_number ?? ""} ${p.name} ${p.position ?? ""} ${team.code}`}
+                    onSelect={() => { onChange(p.id); setOpen(false); }}
+                  >
+                    <Check className={`h-3.5 w-3.5 mr-2 ${value === p.id ? "opacity-100" : "opacity-0"}`} />
+                    <span className="font-mono text-xs text-muted-foreground w-7">
+                      {p.shirt_number != null ? `#${p.shirt_number}` : ""}
+                    </span>
+                    <span className="flex-1 truncate">{p.name}</span>
+                    {p.position && <span className="text-xs text-muted-foreground ml-2">{p.position}</span>}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            ))}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function ScorerMultiSelect({
+  selected, setSelected, disabled, home, away, homeSquad, awaySquad, excludeId,
+}: {
+  selected: string[];
+  setSelected: (v: string[]) => void;
+  disabled: boolean;
+  home: Team; away: Team;
+  homeSquad: Player[]; awaySquad: Player[];
+  excludeId: string | null;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const all = useMemo(() => [
+    ...homeSquad.map((p) => ({ p, team: home })),
+    ...awaySquad.map((p) => ({ p, team: away })),
+  ].filter((x) => x.p.id !== excludeId), [homeSquad, awaySquad, home, away, excludeId]);
+  const selectedList = all.filter((x) => selected.includes(x.p.id));
+
+  const toggle = (id: string) => {
+    if (selected.includes(id)) setSelected(selected.filter((x) => x !== id));
+    else setSelected([...selected, id]);
+  };
+
+  return (
+    <div className="space-y-2">
+      {selectedList.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {selectedList.map(({ p, team }) => (
+            <Badge key={p.id} variant="secondary" className="font-normal pl-2 pr-1 gap-1">
+              <span>{team.flag_emoji}</span>
+              <span className="font-mono text-[10px] text-muted-foreground">
+                {p.shirt_number != null ? `#${p.shirt_number}` : ""}
+              </span>
               <span>{p.name}</span>
-            </label>
-          );
-        })}
-      </div>
+              {!disabled && (
+                <button
+                  type="button"
+                  onClick={() => toggle(p.id)}
+                  className="ml-0.5 rounded hover:bg-muted p-0.5"
+                  aria-label={`Remove ${p.name}`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </Badge>
+          ))}
+        </div>
+      )}
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={disabled}
+            className="w-full justify-between font-normal h-9 text-sm"
+          >
+            <span className="text-muted-foreground">
+              {selectedList.length === 0 ? "Add goalscorers…" : `Add more (${selectedList.length} selected)`}
+            </span>
+            <ChevronsUpDown className="h-3.5 w-3.5 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+          <Command>
+            <CommandInput placeholder="Search player or number…" value={query} onValueChange={setQuery} />
+            <CommandList className="max-h-64">
+              <CommandEmpty>No players found.</CommandEmpty>
+              {[{ team: home, squad: homeSquad }, { team: away, squad: awaySquad }].map(({ team, squad }) => (
+                <CommandGroup key={team.id} heading={`${team.flag_emoji ?? ""} ${team.name}`}>
+                  {squad.filter((p) => p.id !== excludeId).map((p) => {
+                    const checked = selected.includes(p.id);
+                    return (
+                      <CommandItem
+                        key={p.id}
+                        value={`${p.shirt_number ?? ""} ${p.name} ${p.position ?? ""} ${team.code}`}
+                        onSelect={() => toggle(p.id)}
+                      >
+                        <Check className={`h-3.5 w-3.5 mr-2 ${checked ? "opacity-100" : "opacity-0"}`} />
+                        <span className="font-mono text-xs text-muted-foreground w-7">
+                          {p.shirt_number != null ? `#${p.shirt_number}` : ""}
+                        </span>
+                        <span className="flex-1 truncate">{p.name}</span>
+                        {p.position && <span className="text-xs text-muted-foreground ml-2">{p.position}</span>}
+                      </CommandItem>
+                    );
+                  })}
+                </CommandGroup>
+              ))}
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }
