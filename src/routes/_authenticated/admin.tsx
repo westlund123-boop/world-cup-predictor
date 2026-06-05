@@ -489,6 +489,34 @@ function ResultDialog({
             </div>
           </div>
 
+          {status === "finished" && (
+            <div>
+              <Label>
+                Winner{" "}
+                {needsWinner ? (
+                  <span className="text-destructive">(required — tied knockout match)</span>
+                ) : (
+                  <span className="text-muted-foreground text-xs">
+                    (optional — auto-derived from score)
+                  </span>
+                )}
+              </Label>
+              <select
+                value={winner}
+                onChange={(e) => setWinner(e.target.value)}
+                className={`mt-1 w-full h-9 px-3 rounded-md border bg-background text-sm ${
+                  needsWinner && !winner ? "border-destructive" : "border-input"
+                }`}
+              >
+                <option value="">— Auto from score —</option>
+                <option value={home.id}>{home.flag_emoji} {home.name}</option>
+                <option value={away.id}>{away.flag_emoji} {away.name}</option>
+              </select>
+            </div>
+          )}
+
+
+
           <div>
             <Label>First goalscorer</Label>
             <select
