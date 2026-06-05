@@ -27,7 +27,7 @@ export const adminGetAllMatches = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const [{ data: matches }, { data: scorers }] = await Promise.all([
+    const [{ data: matches }, { data: scorers }, { data: cache }] = await Promise.all([
       supabaseAdmin
         .from("matches")
         .select(
@@ -35,8 +35,17 @@ export const adminGetAllMatches = createServerFn({ method: "GET" })
         )
         .order("kickoff_at"),
       supabaseAdmin.from("match_goalscorers").select("match_id,player_id,is_first,ord"),
+      supabaseAdmin
+        .from("leaderboard_cache")
+        .select("updated_at")
+        .order("updated_at", { ascending: false })
+        .limit(1),
     ]);
-    return { matches: matches ?? [], scorers: scorers ?? [] };
+    return {
+      matches: matches ?? [],
+      scorers: scorers ?? [],
+      last_recalc_at: cache?.[0]?.updated_at ?? null,
+    };
   });
 
 // ---------- Admin: match edit (kickoff / teams) ----------
