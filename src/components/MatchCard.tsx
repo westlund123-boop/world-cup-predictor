@@ -5,12 +5,14 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { upsertPrediction } from "@/lib/wc.functions";
 import { matchStatus, STAGE_LABEL } from "@/lib/scoring";
 import { toast } from "sonner";
-import { Lock, CheckCircle2, Clock, Pencil, CircleDashed, Radio } from "lucide-react";
+import { Lock, CheckCircle2, Clock, Pencil, CircleDashed, Radio, ChevronsUpDown, Check, X } from "lucide-react";
 
 type Team = { id: string; name: string; code: string; flag_emoji: string | null; group_letter: string | null };
 type Match = {
