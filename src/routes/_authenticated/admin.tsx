@@ -90,6 +90,7 @@ function AdminInner() {
   const [stage, setStage] = useState<string>("");
   const [group, setGroup] = useState<string>("");
   const [status, setStatus] = useState<string>("");
+  const [resultState, setResultState] = useState<string>("");
   const [date, setDate] = useState<string>("");
   const [editing, setEditing] = useState<any | null>(null);
   const [resulting, setResulting] = useState<any | null>(null);
@@ -97,12 +98,13 @@ function AdminInner() {
   const recalc = useMutation({
     mutationFn: () => recalcFn(),
     onSuccess: (r) => {
-      toast.success(`Points recalculated — ${r.users} users updated`);
+      toast.success("Points recalculated", { description: `${r.users} users updated` });
+      qc.invalidateQueries({ queryKey: ["admin-matches"] });
       qc.invalidateQueries({ queryKey: ["leaderboard"] });
       qc.invalidateQueries({ queryKey: ["leaderboard-cache"] });
       qc.invalidateQueries({ queryKey: ["myPredictions"] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error("Recalculation failed", { description: e.message }),
   });
 
   const exportCsv = useMutation({
@@ -115,9 +117,9 @@ function AdminInner() {
       a.download = r.filename;
       a.click();
       URL.revokeObjectURL(url);
-      toast.success("CSV exported");
+      toast.success("CSV exported", { description: r.filename });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error("Export failed", { description: e.message }),
   });
 
   const filtered = matches.filter((m: any) => {
@@ -125,11 +127,27 @@ function AdminInner() {
     if (group && m.group_letter !== group) return false;
     if (status && m.status !== status) return false;
     if (date && !m.kickoff_at.startsWith(date)) return false;
+    if (resultState) {
+      const started = new Date(m.kickoff_at) <= new Date();
+      const hasScore = m.home_score !== null && m.away_score !== null;
+      if (resultState === "missing" && (m.status === "finished" || hasScore)) return false;
+      if (resultState === "started" && (!started || m.status === "finished")) return false;
+      if (resultState === "finished" && m.status !== "finished") return false;
+      if (resultState === "needs_winner") {
+        const isKO = m.stage !== "group";
+        const tied = hasScore && m.home_score === m.away_score;
+        if (!(m.status === "finished" && isKO && tied && !m.winner_team_id)) return false;
+      }
+    }
     return true;
   });
 
   const stages = ["group", "r32", "r16", "qf", "sf", "third", "final"];
   const groups = Array.from(new Set(matches.map((m: any) => m.group_letter).filter(Boolean))).sort();
+
+  const lastRecalc = bundle?.last_recalc_at
+    ? new Date(bundle.last_recalc_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
+    : "never";
 
   return (
     <div className="space-y-6">
@@ -137,31 +155,54 @@ function AdminInner() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Admin panel</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Enter results, recalculate points, export the leaderboard.
+            Enter results, recalculate points, export the leaderboard. Last recalculation: <span className="font-medium text-foreground">{lastRecalc}</span>
           </p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={() => recalc.mutate()} disabled={recalc.isPending} variant="outline">
-            <Calculator className="h-4 w-4 mr-1.5" />
-            {recalc.isPending ? "Recalculating…" : "Recalculate points"}
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button disabled={recalc.isPending} variant="outline">
+                <Calculator className="h-4 w-4 mr-1.5" />
+                {recalc.isPending ? "Recalculating…" : "Recalculate points"}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Recalculate all points?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This rebuilds the leaderboard for every player from every finished match. It is idempotent and safe to run multiple times.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => recalc.mutate()}>Recalculate</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           <Button onClick={() => exportCsv.mutate()} disabled={exportCsv.isPending}>
             <Download className="h-4 w-4 mr-1.5" />
-            Export CSV
+            {exportCsv.isPending ? "Exporting…" : "Export CSV"}
           </Button>
         </div>
       </header>
 
-      <Card className="p-4 grid grid-cols-2 md:grid-cols-5 gap-3">
+      <Card className="p-4 grid grid-cols-2 md:grid-cols-6 gap-3">
         <Select label="Stage" value={stage} setValue={setStage} options={[["", "All stages"], ...stages.map((s) => [s, STAGE_LABEL[s]] as [string, string])]} />
         <Select label="Group" value={group} setValue={setGroup} options={[["", "All groups"], ...groups.map((g) => [g as string, `Group ${g}`] as [string, string])]} />
         <Select label="Status" value={status} setValue={setStatus} options={[["", "All"], ["scheduled", "Scheduled"], ["live", "Live"], ["finished", "Finished"]]} />
+        <Select label="Result state" value={resultState} setValue={setResultState} options={[
+          ["", "Any"],
+          ["missing", "Missing result"],
+          ["started", "Locked / started"],
+          ["finished", "Finished"],
+          ["needs_winner", "Tied KO — needs winner"],
+        ]} />
         <div>
           <Label className="text-xs uppercase tracking-wider text-muted-foreground">Date</Label>
           <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="mt-1" />
         </div>
         <div className="flex items-end">
-          <Button variant="ghost" onClick={() => { setStage(""); setGroup(""); setStatus(""); setDate(""); }}>
+          <Button variant="ghost" onClick={() => { setStage(""); setGroup(""); setStatus(""); setResultState(""); setDate(""); }}>
             Clear filters
           </Button>
         </div>
@@ -176,7 +217,7 @@ function AdminInner() {
                 <th className="px-3 py-2 text-left">Match</th>
                 <th className="px-3 py-2 text-left">Kickoff</th>
                 <th className="px-3 py-2 text-center">Score</th>
-                <th className="px-3 py-2 text-center">Status</th>
+                <th className="px-3 py-2 text-center">State</th>
                 <th className="px-3 py-2 text-right">Actions</th>
               </tr>
             </thead>
@@ -184,8 +225,14 @@ function AdminInner() {
               {filtered.map((m: any) => {
                 const home = m.home_team_id ? teamMap.get(m.home_team_id) : undefined;
                 const away = m.away_team_id ? teamMap.get(m.away_team_id) : undefined;
+                const hasScore = m.home_score !== null && m.away_score !== null;
+                const isKO = m.stage !== "group";
+                const tied = hasScore && m.home_score === m.away_score;
+                const needsWinner = m.status === "finished" && isKO && tied && !m.winner_team_id;
+                const missing = !hasScore && m.status !== "finished";
+
                 return (
-                  <tr key={m.id} className="hover:bg-muted/30">
+                  <tr key={m.id} className={`hover:bg-muted/30 ${needsWinner ? "bg-destructive/5" : ""}`}>
                     <td className="px-3 py-2">
                       <Badge variant="outline" className="font-normal text-[10px]">
                         {STAGE_LABEL[m.stage]}
@@ -206,10 +253,27 @@ function AdminInner() {
                       {new Date(m.kickoff_at).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })}
                     </td>
                     <td className="px-3 py-2 text-center font-mono">
-                      {m.home_score !== null && m.away_score !== null ? `${m.home_score}–${m.away_score}` : "—"}
+                      {hasScore ? `${m.home_score}–${m.away_score}` : "—"}
                     </td>
                     <td className="px-3 py-2 text-center text-xs">
-                      <StatusTag s={m.status} kickoff={m.kickoff_at} />
+                      <div className="flex flex-col items-center gap-1">
+                        <StatusTag s={m.status} kickoff={m.kickoff_at} />
+                        {needsWinner && (
+                          <span className="inline-flex items-center gap-1 text-destructive text-[10px] font-semibold">
+                            <CircleAlert className="h-3 w-3" /> Winner required
+                          </span>
+                        )}
+                        {missing && (
+                          <span className="inline-flex items-center gap-1 text-muted-foreground text-[10px]">
+                            <CircleDashed className="h-3 w-3" /> No result
+                          </span>
+                        )}
+                        {m.status === "finished" && !needsWinner && (
+                          <span className="inline-flex items-center gap-1 text-primary text-[10px]">
+                            <CircleCheck className="h-3 w-3" /> Saved
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-3 py-2 text-right whitespace-nowrap">
                       <Button size="sm" variant="ghost" onClick={() => setEditing(m)}>
