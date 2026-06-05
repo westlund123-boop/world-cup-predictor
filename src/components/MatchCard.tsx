@@ -20,7 +20,7 @@ type Match = {
   home_score: number | null; away_score: number | null;
   home_team_id: string | null; away_team_id: string | null;
 };
-type Player = { id: string; team_id: string; name: string; position: string | null };
+type Player = { id: string; team_id: string; name: string; position: string | null; shirt_number?: number | null; name_on_shirt?: string | null; club?: string | null };
 type Prediction = {
   id: string; match_id: string; outcome: string; home_score: number; away_score: number;
   first_scorer_player_id: string | null; points: number;
