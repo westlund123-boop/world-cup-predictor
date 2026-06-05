@@ -5,8 +5,8 @@ import { useMemo } from "react";
 import { getMatches, getTeams, getMyPredictions } from "@/lib/wc.functions";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { matchStatus, STAGE_LABEL, predictedWinner } from "@/lib/scoring";
-import { Lock, CheckCircle2, Clock } from "lucide-react";
+import { matchStatus, predictedWinner } from "@/lib/scoring";
+import { Lock, CheckCircle2, Clock, Sparkles } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/bracket")({
   head: () => ({ meta: [{ title: "Knockout bracket — WC 2026 Predictor" }] }),
@@ -26,8 +26,8 @@ function BracketPage() {
   const tFn = useServerFn(getTeams);
   const myFn = useServerFn(getMyPredictions);
 
-  const { data: matches = [] } = useQuery({ queryKey: ["matches"], queryFn: () => mFn() });
-  const { data: teams = [] } = useQuery({ queryKey: ["teams"], queryFn: () => tFn() });
+  const { data: matches = [], isLoading: lm } = useQuery({ queryKey: ["matches"], queryFn: () => mFn() });
+  const { data: teams = [], isLoading: lt } = useQuery({ queryKey: ["teams"], queryFn: () => tFn() });
   const { data: myPreds } = useQuery({ queryKey: ["myPredictions"], queryFn: () => myFn() });
 
   const teamMap = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
@@ -38,25 +38,26 @@ function BracketPage() {
 
   const thirdMatch = matches.find((m) => m.stage === "third");
 
+  if (lm || lt) return <div className="text-muted-foreground text-sm">Loading bracket…</div>;
+
   return (
     <div className="space-y-6">
       <header>
         <h1 className="text-3xl font-bold tracking-tight">Knockout bracket</h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Winners advance automatically as results are entered. Your predicted winner is shown in
-          orange.
+          Winners advance automatically as results are entered. Teams in <span className="text-primary font-semibold">orange</span> are your picks.
         </p>
       </header>
 
-      <div className="overflow-x-auto pb-4">
-        <div className="flex gap-4 min-w-[1100px] lg:min-w-0">
+      <div className="overflow-x-auto pb-4 -mx-4 px-4">
+        <div className="flex gap-3 md:gap-4 min-w-[980px]">
           {COLUMNS.map((col) => {
             const list = matches
               .filter((m) => m.stage === col.stage)
               .sort((a, b) => a.kickoff_at.localeCompare(b.kickoff_at));
             return (
-              <div key={col.stage} className="flex-1 min-w-[210px] space-y-3">
-                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground text-center sticky top-16 bg-background py-1">
+              <div key={col.stage} className="flex-1 min-w-[200px] space-y-3">
+                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground text-center sticky top-16 bg-background py-1 z-10">
                   {col.label}
                 </div>
                 <div
@@ -115,29 +116,32 @@ function BracketMatchCard({
   const finished = status === "finished";
   const myWinnerId = myPred ? predictedWinner(myPred, match) : null;
   const actualWinnerId = match.winner_team_id;
+  const tiedOnScore =
+    finished && match.home_score !== null && match.home_score === match.away_score;
+  const autoAdvanced = !!home && !!away && !!match.bracket_code; // teams were filled by trigger or admin
 
   return (
     <Card className="overflow-hidden">
-      <div className="px-3 py-1.5 bg-muted/40 border-b border-border flex items-center justify-between text-[10px] uppercase tracking-wider">
+      <div className="px-3 py-1.5 bg-muted/40 border-b border-border flex items-center justify-between text-[10px] uppercase tracking-wider gap-2">
         <span className="font-mono text-muted-foreground">{match.bracket_code}</span>
         <StatusPill status={status} />
       </div>
       <div className="divide-y divide-border">
-        <TeamRow team={home} placeholder={match.home_source_code} actualWinner={actualWinnerId === home?.id} myPick={myWinnerId === home?.id} />
-        <TeamRow team={away} placeholder={match.away_source_code} actualWinner={actualWinnerId === away?.id} myPick={myWinnerId === away?.id} />
+        <TeamRow team={home} placeholder={match.home_source_code} actualWinner={actualWinnerId === home?.id} myPick={myWinnerId === home?.id} score={finished ? match.home_score : null} />
+        <TeamRow team={away} placeholder={match.away_source_code} actualWinner={actualWinnerId === away?.id} myPick={myWinnerId === away?.id} score={finished ? match.away_score : null} />
       </div>
-      <div className="px-3 py-2 text-[11px] text-muted-foreground flex items-center justify-between">
-        <span>
+      <div className="px-3 py-2 text-[11px] text-muted-foreground flex items-center justify-between gap-2">
+        <span className="truncate">
           {new Date(match.kickoff_at).toLocaleString(undefined, {
-            month: "short",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
+            month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
           })}
         </span>
-        {finished && match.home_score !== null && (
-          <span className="font-mono font-semibold text-foreground">
-            {match.home_score}–{match.away_score}
+        {tiedOnScore && actualWinnerId && (
+          <Badge variant="outline" className="text-[9px] py-0 h-4">a.e.t / pens</Badge>
+        )}
+        {autoAdvanced && !finished && (
+          <span title="Team auto-advanced from a previous round" className="text-primary inline-flex items-center gap-0.5">
+            <Sparkles className="h-2.5 w-2.5" /> auto
           </span>
         )}
       </div>
@@ -151,26 +155,20 @@ function BracketMatchCard({
 }
 
 function TeamRow({
-  team,
-  placeholder,
-  actualWinner,
-  myPick,
+  team, placeholder, actualWinner, myPick, score,
 }: {
-  team: T;
-  placeholder?: string | null;
-  actualWinner?: boolean;
-  myPick?: boolean;
+  team: T; placeholder?: string | null;
+  actualWinner?: boolean; myPick?: boolean; score?: number | null;
 }) {
   return (
-    <div
-      className={`flex items-center gap-2 px-3 py-2 text-sm ${
-        actualWinner ? "bg-primary/10 font-semibold" : ""
-      }`}
-    >
+    <div className={`flex items-center gap-2 px-3 py-2 text-sm ${actualWinner ? "bg-primary/10 font-semibold" : ""}`}>
       <span className="text-xl leading-none">{team?.flag_emoji ?? "·"}</span>
-      <span className={`flex-1 truncate ${team ? "" : "text-muted-foreground italic text-xs"}`}>
+      <span className={`flex-1 truncate ${team ? "" : "text-muted-foreground italic text-xs"} ${myPick ? "text-primary" : ""}`}>
         {team?.name ?? (placeholder ? `Winner ${placeholder}` : "TBD")}
       </span>
+      {score !== null && score !== undefined && (
+        <span className="font-mono font-semibold text-sm">{score}</span>
+      )}
       {myPick && (
         <Badge variant="outline" className="text-[9px] py-0 h-4 border-primary text-primary">
           My pick
@@ -181,24 +179,7 @@ function TeamRow({
 }
 
 function StatusPill({ status }: { status: "open" | "locked" | "finished" }) {
-  if (status === "open")
-    return (
-      <span className="inline-flex items-center gap-1 text-primary">
-        <Clock className="h-2.5 w-2.5" />
-        Open
-      </span>
-    );
-  if (status === "locked")
-    return (
-      <span className="inline-flex items-center gap-1 text-muted-foreground">
-        <Lock className="h-2.5 w-2.5" />
-        Locked
-      </span>
-    );
-  return (
-    <span className="inline-flex items-center gap-1 text-foreground">
-      <CheckCircle2 className="h-2.5 w-2.5" />
-      Done
-    </span>
-  );
+  if (status === "open") return <span className="inline-flex items-center gap-1 text-primary"><Clock className="h-2.5 w-2.5" />Open</span>;
+  if (status === "locked") return <span className="inline-flex items-center gap-1 text-muted-foreground"><Lock className="h-2.5 w-2.5" />Locked</span>;
+  return <span className="inline-flex items-center gap-1 text-foreground"><CheckCircle2 className="h-2.5 w-2.5" />Done</span>;
 }
