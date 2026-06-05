@@ -22,10 +22,21 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { STAGE_LABEL, matchStatus } from "@/lib/scoring";
-import { Calculator, Download, Pencil, Trophy } from "lucide-react";
+import { Calculator, Download, Pencil, Trophy, CircleAlert, CircleCheck, CircleDashed } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({ meta: [{ title: "Admin — WC 2026 Predictor" }] }),
