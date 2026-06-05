@@ -504,3 +504,237 @@ export const adminExportLeaderboardCSV = createServerFn({ method: "POST" })
     });
     return { csv: lines.join("\n"), filename: `leaderboard-${new Date().toISOString().slice(0, 10)}.csv` };
   });
+
+// ---------- Admin: Squad management ----------
+
+export const adminGetAllPlayers = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
+      .from("players")
+      .select("id,team_id,name,name_on_shirt,position,shirt_number,club,active")
+      .order("team_id")
+      .order("shirt_number", { ascending: true, nullsFirst: false });
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  });
+
+const PlayerUpsertInput = z.object({
+  id: z.string().uuid().optional(),
+  team_id: z.string().uuid(),
+  name: z.string().trim().min(1).max(120),
+  name_on_shirt: z.string().trim().max(40).nullable().optional(),
+  position: z.string().trim().max(20).nullable().optional(),
+  shirt_number: z.number().int().min(1).max(99).nullable().optional(),
+  club: z.string().trim().max(120).nullable().optional(),
+  active: z.boolean().default(true),
+});
+
+export const adminUpsertPlayer = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => PlayerUpsertInput.parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const row = {
+      team_id: data.team_id,
+      name: data.name,
+      name_on_shirt: data.name_on_shirt ?? null,
+      position: data.position ?? null,
+      shirt_number: data.shirt_number ?? null,
+      club: data.club ?? null,
+      active: data.active,
+    };
+    if (data.id) {
+      const { error } = await supabaseAdmin.from("players").update(row).eq("id", data.id);
+      if (error) throw new Error(error.message);
+      return { ok: true, id: data.id };
+    }
+    const { data: ins, error } = await supabaseAdmin
+      .from("players")
+      .insert(row)
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+    return { ok: true, id: ins.id };
+  });
+
+export const adminSetPlayerActive = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({ id: z.string().uuid(), active: z.boolean() }).parse(i)
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("players")
+      .update({ active: data.active })
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// CSV columns: team_code,name,name_on_shirt,position,shirt_number,club,active
+const CSV_HEADERS = ["team_code", "name", "name_on_shirt", "position", "shirt_number", "club", "active"];
+
+function parseCSV(text: string): string[][] {
+  const rows: string[][] = [];
+  let cur: string[] = [];
+  let field = "";
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"' && text[i + 1] === '"') { field += '"'; i++; }
+      else if (c === '"') { inQuotes = false; }
+      else { field += c; }
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ',') { cur.push(field); field = ""; }
+      else if (c === '\n' || c === '\r') {
+        if (c === '\r' && text[i + 1] === '\n') i++;
+        cur.push(field); field = "";
+        if (cur.some((v) => v !== "")) rows.push(cur);
+        cur = [];
+      } else field += c;
+    }
+  }
+  if (field !== "" || cur.length) { cur.push(field); if (cur.some((v) => v !== "")) rows.push(cur); }
+  return rows;
+}
+
+export const adminImportPlayersCSV = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({
+      csv: z.string().min(1).max(2_000_000),
+      mode: z.enum(["replace_team", "upsert"]).default("upsert"),
+    }).parse(i)
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const rows = parseCSV(data.csv);
+    if (rows.length < 2) throw new Error("CSV is empty");
+    const header = rows[0].map((h) => h.trim().toLowerCase());
+    const idx = (k: string) => header.indexOf(k);
+    for (const h of ["team_code", "name"]) {
+      if (idx(h) === -1) throw new Error(`Missing required column: ${h}`);
+    }
+
+    const { data: teams, error: tErr } = await supabaseAdmin.from("teams").select("id,code");
+    if (tErr) throw new Error(tErr.message);
+    const teamByCode = new Map((teams ?? []).map((t) => [t.code.toUpperCase(), t.id]));
+
+    type Row = {
+      team_id: string; team_code: string;
+      name: string; name_on_shirt: string | null;
+      position: string | null; shirt_number: number | null;
+      club: string | null; active: boolean;
+    };
+    const parsed: Row[] = [];
+    const errors: string[] = [];
+
+    for (let r = 1; r < rows.length; r++) {
+      const cols = rows[r];
+      const code = (cols[idx("team_code")] || "").trim().toUpperCase();
+      const name = (cols[idx("name")] || "").trim();
+      if (!code || !name) continue;
+      const team_id = teamByCode.get(code);
+      if (!team_id) { errors.push(`Row ${r + 1}: unknown team_code "${code}"`); continue; }
+      const shirtRaw = idx("shirt_number") >= 0 ? (cols[idx("shirt_number")] || "").trim() : "";
+      const shirt_number = shirtRaw ? Number(shirtRaw) : null;
+      if (shirt_number !== null && (!Number.isInteger(shirt_number) || shirt_number < 1 || shirt_number > 99)) {
+        errors.push(`Row ${r + 1}: invalid shirt_number "${shirtRaw}"`); continue;
+      }
+      const activeRaw = idx("active") >= 0 ? (cols[idx("active")] || "true").trim().toLowerCase() : "true";
+      parsed.push({
+        team_id, team_code: code, name,
+        name_on_shirt: idx("name_on_shirt") >= 0 ? (cols[idx("name_on_shirt")] || "").trim() || null : null,
+        position: idx("position") >= 0 ? (cols[idx("position")] || "").trim() || null : null,
+        shirt_number,
+        club: idx("club") >= 0 ? (cols[idx("club")] || "").trim() || null : null,
+        active: !["false", "0", "no", "inactive"].includes(activeRaw),
+      });
+    }
+
+    if (errors.length) throw new Error(errors.slice(0, 10).join("; "));
+    if (parsed.length === 0) throw new Error("No valid rows found");
+
+    // Duplicate shirt-number check inside CSV per team
+    const seen = new Map<string, Set<number>>();
+    for (const p of parsed) {
+      if (!p.active || p.shirt_number == null) continue;
+      const set = seen.get(p.team_id) ?? new Set<number>();
+      if (set.has(p.shirt_number)) {
+        throw new Error(`Duplicate active shirt #${p.shirt_number} for team ${p.team_code} in CSV`);
+      }
+      set.add(p.shirt_number);
+      seen.set(p.team_id, set);
+    }
+
+    let deactivated = 0;
+    if (data.mode === "replace_team") {
+      const teamIds = Array.from(new Set(parsed.map((p) => p.team_id)));
+      // Soft replace: deactivate existing rows for these teams to preserve FKs from predictions
+      const { data: del, error: dErr } = await supabaseAdmin
+        .from("players")
+        .update({ active: false })
+        .in("team_id", teamIds)
+        .eq("active", true)
+        .select("id");
+      if (dErr) throw new Error(`Deactivate failed: ${dErr.message}`);
+      deactivated = del?.length ?? 0;
+    }
+
+    const insertRows = parsed.map((p) => ({
+      team_id: p.team_id,
+      name: p.name,
+      name_on_shirt: p.name_on_shirt,
+      position: p.position,
+      shirt_number: p.shirt_number,
+      club: p.club,
+      active: p.active,
+    }));
+    const { error: insErr } = await supabaseAdmin.from("players").insert(insertRows);
+    if (insErr) throw new Error(`Insert failed: ${insErr.message}`);
+
+    return { ok: true, inserted: insertRows.length, deactivated };
+  });
+
+export const adminExportPlayersCSV = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const [{ data: players }, { data: teams }] = await Promise.all([
+      supabaseAdmin
+        .from("players")
+        .select("team_id,name,name_on_shirt,position,shirt_number,club,active")
+        .order("team_id")
+        .order("shirt_number", { ascending: true, nullsFirst: false }),
+      supabaseAdmin.from("teams").select("id,code"),
+    ]);
+    const codeMap = new Map((teams ?? []).map((t) => [t.id, t.code]));
+    const esc = (v: any) => {
+      const s = v == null ? "" : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const lines = [CSV_HEADERS.join(",")];
+    for (const p of players ?? []) {
+      lines.push([
+        codeMap.get(p.team_id) ?? "",
+        p.name,
+        p.name_on_shirt ?? "",
+        p.position ?? "",
+        p.shirt_number ?? "",
+        p.club ?? "",
+        p.active ? "true" : "false",
+      ].map(esc).join(","));
+    }
+    return { csv: lines.join("\n"), filename: `squads-${new Date().toISOString().slice(0, 10)}.csv` };
+  });
