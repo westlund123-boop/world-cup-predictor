@@ -74,9 +74,13 @@ const ResultInput = z.object({
   home_score: z.number().int().min(0).max(20),
   away_score: z.number().int().min(0).max(20),
   status: z.enum(["scheduled", "live", "finished"]),
+  // Required for tied KO matches (penalty winner); optional otherwise.
+  winner_team_id: z.string().uuid().nullable().optional(),
   first_scorer_player_id: z.string().uuid().nullable().optional(),
   scorer_player_ids: z.array(z.string().uuid()).max(40).default([]),
 });
+
+const KO_STAGES = new Set(["r32", "r16", "qf", "sf", "third", "final"]);
 
 export const adminSaveResult = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -85,19 +89,82 @@ export const adminSaveResult = createServerFn({ method: "POST" })
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    // Load match for defensive validation
+    const { data: match, error: mErr } = await supabaseAdmin
+      .from("matches")
+      .select("id,stage,home_team_id,away_team_id")
+      .eq("id", data.match_id)
+      .single();
+    if (mErr || !match) throw new Error("Match not found");
+
+    if (data.status === "finished" && (!match.home_team_id || !match.away_team_id)) {
+      throw new Error("Cannot save a result before both teams are assigned");
+    }
+
+    // Resolve winner_team_id
+    let winner_team_id: string | null = null;
+    if (data.status === "finished" && match.home_team_id && match.away_team_id) {
+      if (data.winner_team_id) {
+        if (
+          data.winner_team_id !== match.home_team_id &&
+          data.winner_team_id !== match.away_team_id
+        ) {
+          throw new Error("Winner must be the home or away team");
+        }
+        winner_team_id = data.winner_team_id;
+      } else if (data.home_score > data.away_score) {
+        winner_team_id = match.home_team_id;
+      } else if (data.away_score > data.home_score) {
+        winner_team_id = match.away_team_id;
+      } else if (KO_STAGES.has(match.stage)) {
+        throw new Error(
+          "Knockout match is tied — pick the penalty-shootout winner before saving"
+        );
+      }
+      // Group draw → winner_team_id stays null
+    }
+
+    // Dedupe and validate scorer squad membership
+    const uniqueScorerIds = Array.from(new Set(data.scorer_player_ids));
+    if (
+      data.first_scorer_player_id &&
+      !uniqueScorerIds.includes(data.first_scorer_player_id)
+    ) {
+      throw new Error("First scorer must also be selected in All goalscorers");
+    }
+    if (uniqueScorerIds.length > 0 && match.home_team_id && match.away_team_id) {
+      const { data: validPlayers, error: pErr } = await supabaseAdmin
+        .from("players")
+        .select("id")
+        .in("id", uniqueScorerIds)
+        .in("team_id", [match.home_team_id, match.away_team_id]);
+      if (pErr) throw new Error(pErr.message);
+      const validIds = new Set((validPlayers ?? []).map((p) => p.id));
+      const bad = uniqueScorerIds.filter((id) => !validIds.has(id));
+      if (bad.length > 0) {
+        throw new Error("Goalscorer(s) do not belong to either team in this match");
+      }
+    }
+
     const { error: uErr } = await supabaseAdmin
       .from("matches")
       .update({
         home_score: data.home_score,
         away_score: data.away_score,
         status: data.status,
+        winner_team_id,
         finished_at: data.status === "finished" ? new Date().toISOString() : null,
       })
       .eq("id", data.match_id);
     if (uErr) throw new Error(uErr.message);
 
     // Replace goalscorer rows
-    await supabaseAdmin.from("match_goalscorers").delete().eq("match_id", data.match_id);
+    const { error: dErr } = await supabaseAdmin
+      .from("match_goalscorers")
+      .delete()
+      .eq("match_id", data.match_id);
+    if (dErr) throw new Error(dErr.message);
+
     const rows: { match_id: string; player_id: string; is_first: boolean; ord: number }[] = [];
     let ord = 0;
     if (data.first_scorer_player_id) {
@@ -108,7 +175,7 @@ export const adminSaveResult = createServerFn({ method: "POST" })
         ord: ord++,
       });
     }
-    for (const pid of data.scorer_player_ids) {
+    for (const pid of uniqueScorerIds) {
       if (pid === data.first_scorer_player_id) continue;
       rows.push({ match_id: data.match_id, player_id: pid, is_first: false, ord: ord++ });
     }
@@ -289,8 +356,8 @@ export const adminRecalculate = createServerFn({ method: "POST" })
       await supabaseAdmin.from("top3_predictions").update({ points: u.points }).eq("user_id", u.user_id);
     }
 
-    // Rebuild leaderboard_cache fully (idempotent)
-    await supabaseAdmin.from("leaderboard_cache").delete().neq("user_id", "00000000-0000-0000-0000-000000000000");
+    // Rebuild leaderboard_cache via upsert by user_id (PK).
+    // Safer than delete-then-insert: stays consistent on partial failure.
     const rows = [...totals.entries()].map(([user_id, v]) => ({
       user_id,
       total: v.match_points + v.goalscorer_points + v.knockout_points + v.top3_points,
@@ -300,13 +367,25 @@ export const adminRecalculate = createServerFn({ method: "POST" })
       top3_points: v.top3_points,
       exact_count: v.exact_count,
       onextwo_count: v.onextwo_count,
+      // predictions_made = total submitted predictions (all stages, including unfinished).
       predictions_made: v.predictions_made,
       top3_submitted_at: v.top3_submitted_at,
       updated_at: new Date().toISOString(),
     }));
     if (rows.length > 0) {
-      const { error } = await supabaseAdmin.from("leaderboard_cache").insert(rows);
-      if (error) throw new Error(error.message);
+      const { error: upErr } = await supabaseAdmin
+        .from("leaderboard_cache")
+        .upsert(rows, { onConflict: "user_id" });
+      if (upErr) throw new Error(`Leaderboard upsert failed: ${upErr.message}`);
+    }
+    // Remove stale cache rows for users that no longer have a profile
+    const keepIds = rows.map((r) => r.user_id);
+    if (keepIds.length > 0) {
+      const { error: delErr } = await supabaseAdmin
+        .from("leaderboard_cache")
+        .delete()
+        .not("user_id", "in", `(${keepIds.map((id) => `"${id}"`).join(",")})`);
+      if (delErr) throw new Error(`Leaderboard cleanup failed: ${delErr.message}`);
     }
 
     return { ok: true, users: rows.length, finished_matches: finished.length };
@@ -365,7 +444,17 @@ export const adminExportLeaderboardCSV = createServerFn({ method: "POST" })
       department: pMap.get(c.user_id)?.department ?? "",
       email: emailMap.get(c.user_id) ?? "",
     }));
-    rows.sort((a: any, b: any) => b.total - a.total);
+    // Same tie-breakers as getCachedLeaderboard
+    rows.sort((a: any, b: any) => {
+      if (b.total !== a.total) return b.total - a.total;
+      if (b.exact_count !== a.exact_count) return b.exact_count - a.exact_count;
+      if (b.onextwo_count !== a.onextwo_count) return b.onextwo_count - a.onextwo_count;
+      if (b.goalscorer_points !== a.goalscorer_points)
+        return b.goalscorer_points - a.goalscorer_points;
+      const at = a.top3_submitted_at ? new Date(a.top3_submitted_at).getTime() : Infinity;
+      const bt = b.top3_submitted_at ? new Date(b.top3_submitted_at).getTime() : Infinity;
+      return at - bt;
+    });
 
     const header = [
       "Rank",
