@@ -562,7 +562,8 @@ function ResultDialog({
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={() => save.mutate()} disabled={save.isPending}>
+          <Button onClick={() => save.mutate()} disabled={save.isPending || (needsWinner && !winner)}>
+
             {save.isPending ? "Saving…" : "Save result"}
           </Button>
         </DialogFooter>
