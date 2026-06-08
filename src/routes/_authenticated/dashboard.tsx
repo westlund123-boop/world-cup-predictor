@@ -15,7 +15,7 @@ import { TeamFlag } from "@/components/TeamFlag";
 import { matchStatus, STAGE_LABEL } from "@/lib/scoring";
 import { Trophy, Target, TrendingUp, Calendar, ArrowRight, MessageSquare, Trash2, Send, Sparkles, Smile, Flag } from "lucide-react";
 import { toast } from "sonner";
-import aumovioLogo from "@/assets/aumovio-white.svg.asset.json";
+import aumovioLogo from "@/assets/aumovio-official.svg.asset.json";
 import { NewsPanel } from "@/components/NewsPanel";
 
 // Lazy so the ~200kb emoji bundle never blocks initial dashboard render.
