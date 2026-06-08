@@ -15,7 +15,7 @@ import { TeamFlag } from "@/components/TeamFlag";
 import { matchStatus, STAGE_LABEL } from "@/lib/scoring";
 import { Trophy, Target, TrendingUp, Calendar, ArrowRight, MessageSquare, Trash2, Send, Sparkles, Smile, Flag } from "lucide-react";
 import { toast } from "sonner";
-import aumovioLogo from "@/assets/aumovio-logo.svg.asset.json";
+import aumovioLogo from "@/assets/aumovio-white.svg.asset.json";
 import { NewsPanel } from "@/components/NewsPanel";
 
 // Lazy so the ~200kb emoji bundle never blocks initial dashboard render.
@@ -101,7 +101,7 @@ function Dashboard() {
             <img
               src={aumovioLogo.url}
               alt="Aumovio AB"
-              className="h-14 md:h-20 lg:h-24 w-auto"
+              className="h-10 md:h-14 lg:h-16 w-auto opacity-95"
             />
           </div>
         </div>
