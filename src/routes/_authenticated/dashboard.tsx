@@ -101,7 +101,7 @@ function Dashboard() {
             <img
               src={aumovioLogo.url}
               alt="Aumovio AB"
-              className="h-14 md:h-20 lg:h-24 w-auto rounded-md drop-shadow-lg"
+              className="h-14 md:h-20 lg:h-24 w-auto"
             />
           </div>
         </div>
