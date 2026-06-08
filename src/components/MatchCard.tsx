@@ -13,6 +13,7 @@ import { upsertPrediction } from "@/lib/wc.functions";
 import { matchStatus, STAGE_LABEL } from "@/lib/scoring";
 import { toast } from "sonner";
 import { Lock, CheckCircle2, Pencil, CircleDashed, Radio, ChevronsUpDown, Check, X } from "lucide-react";
+import { TeamFlag } from "@/components/TeamFlag";
 
 type Team = { id: string; name: string; code: string; flag_emoji: string | null; group_letter: string | null };
 type Match = {

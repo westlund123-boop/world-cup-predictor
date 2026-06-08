@@ -119,13 +119,13 @@ function MyPredictionsPage() {
                     <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
                       <div className="flex items-center gap-2 justify-end text-right">
                         <span className="font-semibold text-sm">{home?.name ?? "TBD"}</span>
-                        <span className="text-2xl">{home?.flag_emoji}</span>
+                        <TeamFlag code={home?.code} name={home?.name} size="lg" />
                       </div>
                       <div className="font-mono text-lg font-bold text-primary">
                         {pred.home_score}–{pred.away_score}
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-2xl">{away?.flag_emoji}</span>
+                        <TeamFlag code={away?.code} name={away?.name} size="lg" />
                         <span className="font-semibold text-sm">{away?.name ?? "TBD"}</span>
                       </div>
                     </div>

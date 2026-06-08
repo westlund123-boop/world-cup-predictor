@@ -162,7 +162,7 @@ function TeamRow({
 }) {
   return (
     <div className={`flex items-center gap-2 px-3 py-2 text-sm ${actualWinner ? "bg-primary/10 font-semibold" : ""}`}>
-      <span className="text-xl leading-none">{team?.flag_emoji ?? "·"}</span>
+      {team ? <TeamFlag code={team.code} name={team.name} size="sm" /> : <span className="text-xl leading-none">·</span>}
       <span className={`flex-1 truncate ${team ? "" : "text-muted-foreground italic text-xs"} ${myPick ? "text-primary" : ""}`}>
         {team?.name ?? (placeholder ? `Winner ${placeholder}` : "TBD")}
       </span>
