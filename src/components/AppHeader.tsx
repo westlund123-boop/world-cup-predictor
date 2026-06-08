@@ -11,6 +11,7 @@ export function AppHeader({ isAdmin }: { isAdmin?: boolean }) {
     { to: "/my-predictions", label: "My Predictions" },
     { to: "/bracket", label: "Bracket" },
     { to: "/top3", label: "Top 3" },
+    { to: "/top-scorers", label: "Top Scorers" },
     { to: "/leaderboard", label: "Leaderboard" },
     { to: "/rules", label: "Rules" },
   ];

@@ -135,6 +135,7 @@ function Leaderboard() {
                 <th className="px-4 py-3 text-right hidden md:table-cell" title="First scorer + other scorers">Scorers</th>
                 <th className="px-4 py-3 text-right hidden lg:table-cell" title="Correct KO advancement & winner">KO</th>
                 <th className="px-4 py-3 text-right hidden lg:table-cell" title="Champion / Silver / Bronze">Top 3</th>
+                <th className="px-4 py-3 text-right hidden lg:table-cell" title="Top Scorer League ranked picks">Top Scorers</th>
                 <th className="px-4 py-3 text-right hidden xl:table-cell" title="Exact score predictions">✓ Exact</th>
                 <th className="px-4 py-3 text-right hidden xl:table-cell" title="Correct 1X2 outcome">✓ 1X2</th>
                 <th className="px-4 py-3 text-right">Total</th>
@@ -162,6 +163,7 @@ function Leaderboard() {
                     <td className="px-4 py-3 text-right font-mono hidden md:table-cell">{r.goalscorer_points}</td>
                     <td className="px-4 py-3 text-right font-mono hidden lg:table-cell">{r.knockout_points}</td>
                     <td className="px-4 py-3 text-right font-mono hidden lg:table-cell">{r.top3_points}</td>
+                    <td className="px-4 py-3 text-right font-mono hidden lg:table-cell">{r.top_scorer_points ?? 0}</td>
                     <td className="px-4 py-3 text-right font-mono hidden xl:table-cell">{r.exact_count}</td>
                     <td className="px-4 py-3 text-right font-mono hidden xl:table-cell">{r.onextwo_count}</td>
                     <td className="px-4 py-3 text-right font-bold text-primary">{r.total}</td>
@@ -170,7 +172,7 @@ function Leaderboard() {
               })}
               {!isLoading && filtered.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                  <td colSpan={11} className="px-4 py-12 text-center text-sm text-muted-foreground">
                     No players match your filter.
                   </td>
                 </tr>

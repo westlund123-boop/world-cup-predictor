@@ -5,6 +5,7 @@ import {
   scoreMatchPrediction,
   scoreGoalscorers,
   scoreTop3,
+  scoreTopScorerLeague,
   knockoutPointsForStage,
   predictedWinner,
 } from "./scoring";
@@ -214,6 +215,8 @@ async function runRecalculation(supabaseAdmin: any) {
     { data: predScorers },
     { data: actualScorers },
     { data: top3s },
+    { data: tsParents },
+    { data: tsPicks },
   ] = await Promise.all([
     supabaseAdmin.from("profiles").select("id"),
     supabaseAdmin
@@ -231,12 +234,15 @@ async function runRecalculation(supabaseAdmin: any) {
     supabaseAdmin
       .from("top3_predictions")
       .select("user_id,winner_team_id,runner_up_team_id,third_team_id,submitted_at"),
+    supabaseAdmin.from("top_scorer_predictions").select("user_id,submitted_at"),
+    supabaseAdmin.from("top_scorer_prediction_picks").select("user_id,rank,player_id"),
   ]);
 
   const matchById = new Map((matches ?? []).map((m: any) => [m.id, m]));
   const finished = (matches ?? []).filter(
     (m: any) => m.status === "finished" && m.home_score !== null && m.away_score !== null
   );
+  const finishedIds = new Set(finished.map((m: any) => m.id));
 
   const actualByMatch = new Map<string, { first: string | null; all: string[] }>();
   for (const g of actualScorers ?? []) {
@@ -267,6 +273,27 @@ async function runRecalculation(supabaseAdmin: any) {
     actualThird = thirdMatch.winner_team_id;
   }
 
+  // ---- Top Scorer League standings (derived from finished match_goalscorers) ----
+  const goalsByPlayer = new Map<string, number>();
+  for (const g of actualScorers ?? []) {
+    if (!finishedIds.has(g.match_id)) continue;
+    goalsByPlayer.set(g.player_id, (goalsByPlayer.get(g.player_id) ?? 0) + 1);
+  }
+  const standings = Array.from(goalsByPlayer.entries())
+    .map(([player_id, goals]) => ({ player_id, goals }))
+    .sort((a, b) => b.goals - a.goals);
+  // Dense ranking with shared ranks for ties (1, 2, 2, 4, ...)
+  const actualRankByPlayer = new Map<string, number>();
+  let lastGoals = -1;
+  let lastRank = 0;
+  standings.forEach((s, i) => {
+    if (s.goals !== lastGoals) {
+      lastRank = i + 1;
+      lastGoals = s.goals;
+    }
+    actualRankByPlayer.set(s.player_id, lastRank);
+  });
+
   const totals = new Map<
     string,
     {
@@ -274,6 +301,7 @@ async function runRecalculation(supabaseAdmin: any) {
       goalscorer_points: number;
       knockout_points: number;
       top3_points: number;
+      top_scorer_points: number;
       exact_count: number;
       onextwo_count: number;
       predictions_made: number;
@@ -286,6 +314,7 @@ async function runRecalculation(supabaseAdmin: any) {
       goalscorer_points: 0,
       knockout_points: 0,
       top3_points: 0,
+      top_scorer_points: 0,
       exact_count: 0,
       onextwo_count: 0,
       predictions_made: 0,
@@ -354,20 +383,42 @@ async function runRecalculation(supabaseAdmin: any) {
     top3PointsUpdates.push({ user_id: t.user_id, points: pts });
   }
 
+  // ---- Top Scorer League per-user scoring ----
+  const picksByUser = new Map<string, (string | null)[]>();
+  for (const pk of tsPicks ?? []) {
+    const arr = picksByUser.get(pk.user_id) ?? new Array(10).fill(null);
+    if (pk.rank >= 1 && pk.rank <= 10) arr[pk.rank - 1] = pk.player_id;
+    picksByUser.set(pk.user_id, arr);
+  }
+  const tsPointsUpdates: { user_id: string; points: number }[] = [];
+  for (const parent of tsParents ?? []) {
+    const acc = totals.get(parent.user_id);
+    if (!acc) continue;
+    const predicted = picksByUser.get(parent.user_id) ?? [];
+    const pts = scoreTopScorerLeague(predicted, actualRankByPlayer);
+    acc.top_scorer_points += pts;
+    tsPointsUpdates.push({ user_id: parent.user_id, points: pts });
+  }
+
   for (const u of predPointsUpdates) {
     await supabaseAdmin.from("predictions").update({ points: u.points }).eq("id", u.id);
   }
   for (const u of top3PointsUpdates) {
     await supabaseAdmin.from("top3_predictions").update({ points: u.points }).eq("user_id", u.user_id);
   }
+  for (const u of tsPointsUpdates) {
+    await supabaseAdmin.from("top_scorer_predictions").update({ points: u.points }).eq("user_id", u.user_id);
+  }
 
   const rows = [...totals.entries()].map(([user_id, v]) => ({
     user_id,
-    total: v.match_points + v.goalscorer_points + v.knockout_points + v.top3_points,
+    total:
+      v.match_points + v.goalscorer_points + v.knockout_points + v.top3_points + v.top_scorer_points,
     match_points: v.match_points,
     goalscorer_points: v.goalscorer_points,
     knockout_points: v.knockout_points,
     top3_points: v.top3_points,
+    top_scorer_points: v.top_scorer_points,
     exact_count: v.exact_count,
     onextwo_count: v.onextwo_count,
     predictions_made: v.predictions_made,
@@ -476,6 +527,7 @@ export const adminExportLeaderboardCSV = createServerFn({ method: "POST" })
       "Goalscorer points",
       "Knockout points",
       "Top 3 points",
+      "Top scorer points",
       "Exact scores",
       "Correct 1X2",
     ];
@@ -496,6 +548,7 @@ export const adminExportLeaderboardCSV = createServerFn({ method: "POST" })
           r.goalscorer_points,
           r.knockout_points,
           r.top3_points,
+          r.top_scorer_points ?? 0,
           r.exact_count,
           r.onextwo_count,
         ]

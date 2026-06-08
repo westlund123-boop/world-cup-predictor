@@ -152,7 +152,7 @@ export function MatchCard({
         </div>
 
         <div>
-          <Label className="text-xs uppercase tracking-wider text-muted-foreground">First goalscorer (+4 pts)</Label>
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground">First goalscorer (+10 pts)</Label>
           <PlayerCombobox
             disabled={locked}
             value={firstScorer}
@@ -166,7 +166,7 @@ export function MatchCard({
         </div>
 
         <div className="space-y-2">
-          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Other goalscorers (2 pts each, max 8)</Label>
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Other goalscorers (5 pts each, max 20)</Label>
           <ScorerMultiSelect
             disabled={locked}
             selected={scorers}
