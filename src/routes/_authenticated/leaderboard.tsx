@@ -135,6 +135,7 @@ function Leaderboard() {
                 <th className="px-4 py-3 text-right hidden md:table-cell" title="First scorer + other scorers">Scorers</th>
                 <th className="px-4 py-3 text-right hidden lg:table-cell" title="Correct KO advancement & winner">KO</th>
                 <th className="px-4 py-3 text-right hidden lg:table-cell" title="Champion / Silver / Bronze">Top 3</th>
+                <th className="px-4 py-3 text-right hidden lg:table-cell" title="Top Scorer League ranked picks">Top Scorers</th>
                 <th className="px-4 py-3 text-right hidden xl:table-cell" title="Exact score predictions">✓ Exact</th>
                 <th className="px-4 py-3 text-right hidden xl:table-cell" title="Correct 1X2 outcome">✓ 1X2</th>
                 <th className="px-4 py-3 text-right">Total</th>
