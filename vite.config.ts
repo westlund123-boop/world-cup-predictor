@@ -10,11 +10,6 @@ const PUBLIC_BACKEND_URL = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE
 const PUBLIC_BACKEND_KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_PUBLISHABLE_KEY ?? "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJIUzI1NiIsInJlZiI6Im5zbnhha2JwdnZwaXdyZnVyanFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1NjM3OTMsImV4cCI6MjA5NjEzOTc5M30.nVAKamCOortx5LOwlZyeDvJubnglsGKtSsd0yVS5WIM";
 
 export default defineConfig({
-  tanstackStart: {
-    // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
-    // nitro/vite builds from this; keep this marker so publish rebuilds regenerate serverFn manifests.
-    server: { entry: "server" },
-  },
   vite: {
     define: {
       "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(
