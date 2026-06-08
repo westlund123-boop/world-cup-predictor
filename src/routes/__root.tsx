@@ -77,14 +77,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
+      { title: "AUMOVIO VM BETTING" },
+      { name: "description", content: "A web app for company employees to predict FIFA World Cup matches, track scores, and compete on a live leaderboard." },
       { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { property: "og:title", content: "AUMOVIO VM BETTING" },
+      { property: "og:description", content: "A web app for company employees to predict FIFA World Cup matches, track scores, and compete on a live leaderboard." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "AUMOVIO VM BETTING" },
+      { name: "twitter:description", content: "A web app for company employees to predict FIFA World Cup matches, track scores, and compete on a live leaderboard." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/a4aa9058-345f-439c-9635-b96931361df6/id-preview-79b774fd--ab4a6627-ca06-449a-b2f2-9a8b11dc29c0.lovable.app-1780932440485.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/a4aa9058-345f-439c-9635-b96931361df6/id-preview-79b774fd--ab4a6627-ca06-449a-b2f2-9a8b11dc29c0.lovable.app-1780932440485.png" },
     ],
     links: [
       {
