@@ -286,3 +286,131 @@ export const deleteWallMessage = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+// ---------- Top Scorer League ----------
+
+/**
+ * Compute live standings derived from match_goalscorers (goals across finished matches).
+ * Returns players sorted by goal count descending. Ties share the same rank (1224 system).
+ */
+export const getTopScorerStandings = createServerFn({ method: "GET" }).handler(async () => {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const [{ data: scorers, error: sErr }, { data: matches, error: mErr }, { data: players, error: pErr }] = await Promise.all([
+    supabaseAdmin.from("match_goalscorers").select("match_id,player_id"),
+    supabaseAdmin.from("matches").select("id,status"),
+    supabaseAdmin.from("players").select("id,name,name_on_shirt,team_id,shirt_number,position"),
+  ]);
+  if (sErr) throw new Error(sErr.message);
+  if (mErr) throw new Error(mErr.message);
+  if (pErr) throw new Error(pErr.message);
+
+  const finishedMatchIds = new Set((matches ?? []).filter((m) => m.status === "finished").map((m) => m.id));
+  const counts = new Map<string, number>();
+  for (const g of scorers ?? []) {
+    if (!finishedMatchIds.has(g.match_id)) continue;
+    counts.set(g.player_id, (counts.get(g.player_id) ?? 0) + 1);
+  }
+
+  const playerMap = new Map((players ?? []).map((p) => [p.id, p]));
+  const rows = Array.from(counts.entries())
+    .map(([player_id, goals]) => {
+      const pl = playerMap.get(player_id);
+      return {
+        player_id,
+        goals,
+        name: pl?.name ?? "—",
+        name_on_shirt: pl?.name_on_shirt ?? null,
+        team_id: pl?.team_id ?? null,
+        shirt_number: pl?.shirt_number ?? null,
+        position: pl?.position ?? null,
+      };
+    })
+    .sort((a, b) => b.goals - a.goals || a.name.localeCompare(b.name));
+
+  // Dense rank with shared rank for ties (1, 2, 2, 4, ...)
+  let lastGoals = -1;
+  let lastRank = 0;
+  const ranked = rows.map((r, idx) => {
+    if (r.goals !== lastGoals) {
+      lastRank = idx + 1;
+      lastGoals = r.goals;
+    }
+    return { ...r, rank: lastRank };
+  });
+
+  return ranked;
+});
+
+export const getMyTopScorerLeague = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const [{ data: parent }, { data: picks }] = await Promise.all([
+      supabase
+        .from("top_scorer_predictions")
+        .select("user_id,submitted_at,points")
+        .eq("user_id", userId)
+        .maybeSingle(),
+      supabase
+        .from("top_scorer_prediction_picks")
+        .select("rank,player_id")
+        .eq("user_id", userId)
+        .order("rank"),
+    ]);
+    return { parent: parent ?? null, picks: picks ?? [] };
+  });
+
+const TopScorerLeagueInput = z.object({
+  picks: z
+    .array(z.object({ rank: z.number().int().min(1).max(10), player_id: z.string().uuid() }))
+    .length(10),
+});
+
+export const upsertTopScorerLeague = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => TopScorerLeagueInput.parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+
+    // Lock if the tournament has started (any match has kicked off).
+    const { data: started } = await supabase
+      .from("matches")
+      .select("kickoff_at")
+      .order("kickoff_at")
+      .limit(1);
+    if (started && started.length > 0 && new Date(started[0].kickoff_at) <= new Date()) {
+      throw new Error("Top Scorer League predictions are locked — the tournament has started");
+    }
+
+    // Validate: 10 distinct players, ranks 1..10 exactly once
+    const ranks = data.picks.map((p) => p.rank).sort((a, b) => a - b);
+    for (let i = 0; i < 10; i++) {
+      if (ranks[i] !== i + 1) throw new Error("Ranks must be 1 through 10, each once");
+    }
+    const playerIds = data.picks.map((p) => p.player_id);
+    if (new Set(playerIds).size !== 10) throw new Error("Pick 10 distinct players");
+
+    // Verify players exist
+    const { data: pls, error: pErr } = await supabase.from("players").select("id").in("id", playerIds);
+    if (pErr) throw new Error(pErr.message);
+    if ((pls ?? []).length !== 10) throw new Error("One or more selected players are invalid");
+
+    // Upsert parent row
+    const { error: upErr } = await supabase
+      .from("top_scorer_predictions")
+      .upsert({ user_id: userId, submitted_at: new Date().toISOString() });
+    if (upErr) throw new Error(upErr.message);
+
+    // Replace picks atomically
+    const { error: delErr } = await supabase
+      .from("top_scorer_prediction_picks")
+      .delete()
+      .eq("user_id", userId);
+    if (delErr) throw new Error(delErr.message);
+
+    const rows = data.picks.map((p) => ({ user_id: userId, rank: p.rank, player_id: p.player_id }));
+    const { error: insErr } = await supabase.from("top_scorer_prediction_picks").insert(rows);
+    if (insErr) throw new Error(insErr.message);
+
+    return { ok: true };
+  });
