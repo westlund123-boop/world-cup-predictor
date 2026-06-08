@@ -163,6 +163,7 @@ function Leaderboard() {
                     <td className="px-4 py-3 text-right font-mono hidden md:table-cell">{r.goalscorer_points}</td>
                     <td className="px-4 py-3 text-right font-mono hidden lg:table-cell">{r.knockout_points}</td>
                     <td className="px-4 py-3 text-right font-mono hidden lg:table-cell">{r.top3_points}</td>
+                    <td className="px-4 py-3 text-right font-mono hidden lg:table-cell">{r.top_scorer_points ?? 0}</td>
                     <td className="px-4 py-3 text-right font-mono hidden xl:table-cell">{r.exact_count}</td>
                     <td className="px-4 py-3 text-right font-mono hidden xl:table-cell">{r.onextwo_count}</td>
                     <td className="px-4 py-3 text-right font-bold text-primary">{r.total}</td>
@@ -171,7 +172,7 @@ function Leaderboard() {
               })}
               {!isLoading && filtered.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                  <td colSpan={11} className="px-4 py-12 text-center text-sm text-muted-foreground">
                     No players match your filter.
                   </td>
                 </tr>
