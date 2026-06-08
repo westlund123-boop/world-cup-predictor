@@ -50,39 +50,44 @@ function Dashboard() {
   return (
     <div className="space-y-8">
       <section
-        className="relative overflow-hidden rounded-2xl p-6 md:p-10 text-primary-foreground"
+        className="relative overflow-hidden rounded-2xl text-primary-foreground"
         style={{ background: "var(--gradient-hero)" }}
       >
         {/* Playful floating emoji confetti */}
-        <div aria-hidden className="pointer-events-none absolute inset-0 select-none text-3xl md:text-4xl opacity-30">
-          <span className="absolute top-4 right-8 animate-bounce" style={{ animationDuration: "3s" }}>⚽</span>
-          <span className="absolute top-16 right-28 animate-pulse">🏆</span>
-          <span className="absolute bottom-6 right-16 animate-bounce" style={{ animationDuration: "4s", animationDelay: "0.5s" }}>🎉</span>
-          <span className="absolute bottom-10 right-40 animate-pulse" style={{ animationDelay: "1s" }}>🥅</span>
-          <span className="absolute top-8 left-1/2 animate-bounce" style={{ animationDuration: "5s" }}>🎯</span>
+        <div aria-hidden className="pointer-events-none absolute inset-0 select-none text-3xl md:text-4xl opacity-25">
+          <span className="absolute top-6 right-[18%] animate-bounce" style={{ animationDuration: "3s" }}>⚽</span>
+          <span className="absolute top-20 right-[8%] animate-pulse">🏆</span>
+          <span className="absolute bottom-6 right-[28%] animate-bounce" style={{ animationDuration: "4s", animationDelay: "0.5s" }}>🎉</span>
+          <span className="absolute bottom-12 right-[12%] animate-pulse" style={{ animationDelay: "1s" }}>🥅</span>
+          <span className="absolute top-1/2 right-[40%] animate-bounce" style={{ animationDuration: "5s" }}>🎯</span>
         </div>
 
-        <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-          <div className="flex-1">
-            <div className="inline-flex items-center gap-2 text-[11px] md:text-xs uppercase tracking-[0.2em] text-primary-foreground/85 font-semibold bg-primary-foreground/10 backdrop-blur px-3 py-1.5 rounded-full">
-              <Sparkles className="h-3 w-3" /> World Cup Betting for Aumovio AB
-            </div>
-            <h1 className="text-3xl md:text-5xl font-bold tracking-tight mt-3">
-              Hej {me?.profile?.name?.split(" ")[0] ?? "spelare"}! <span className="inline-block animate-wave origin-[70%_70%]">👋</span>
-            </h1>
-            <p className="text-primary-foreground/90 mt-2 text-base md:text-lg max-w-xl">
-              {openWithoutPred > 0
-                ? `Du har ${openWithoutPred} öppen match${openWithoutPred === 1 ? "" : "er"} kvar att tippa. Lycka till! 🍀`
-                : "Allt tippat — luta dig tillbaka och håll tummarna. 🤞"}
-            </p>
+        {/* Top brand bar */}
+        <div className="relative flex items-center justify-between gap-4 px-6 md:px-10 pt-5">
+          <div className="inline-flex items-center gap-2 text-[10px] md:text-[11px] uppercase tracking-[0.22em] text-primary-foreground/90 font-semibold bg-primary-foreground/10 backdrop-blur px-3 py-1.5 rounded-full">
+            <Sparkles className="h-3 w-3" /> World Cup Betting for Aumovio AB
           </div>
-          <div className="shrink-0 bg-primary-foreground/95 rounded-xl p-4 md:p-5 shadow-xl">
+          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-primary-foreground/70 font-medium">
+            <span className="hidden sm:inline">presented by</span>
             <img
               src={aumovioLogo.url}
               alt="Aumovio AB"
-              className="h-10 md:h-14 w-auto"
+              className="h-5 md:h-6 w-auto rounded-sm"
             />
           </div>
+        </div>
+
+        {/* Hero greeting */}
+        <div className="relative px-6 md:px-10 pt-6 pb-8 md:pb-10">
+          <h1 className="text-3xl md:text-5xl font-bold tracking-tight">
+            Hej {me?.profile?.name?.split(" ")[0] ?? "spelare"}!{" "}
+            <span className="inline-block animate-wave origin-[70%_70%]">👋</span>
+          </h1>
+          <p className="text-primary-foreground/90 mt-2 text-base md:text-lg max-w-xl">
+            {openWithoutPred > 0
+              ? `Du har ${openWithoutPred} öppen match${openWithoutPred === 1 ? "" : "er"} kvar att tippa. Lycka till! 🍀`
+              : "Allt tippat — luta dig tillbaka och håll tummarna. 🤞"}
+          </p>
         </div>
       </section>
 
