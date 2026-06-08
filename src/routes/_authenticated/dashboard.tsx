@@ -199,6 +199,7 @@ function WallSection({ meId, isAdmin }: { meId?: string; isAdmin: boolean }) {
   const postFn = useServerFn(postWallMessage);
   const delFn = useServerFn(deleteWallMessage);
   const [body, setBody] = useState("");
+  const taRef = useRef<HTMLTextAreaElement | null>(null);
 
   const { data: messages = [] } = useQuery({
     queryKey: ["wall"],
@@ -220,6 +221,23 @@ function WallSection({ meId, isAdmin }: { meId?: string; isAdmin: boolean }) {
   const text = body.trim();
   const tooLong = text.length > 500;
 
+  function insertAtCursor(insert: string) {
+    const ta = taRef.current;
+    if (!ta) {
+      setBody((b) => (b + insert).slice(0, 500));
+      return;
+    }
+    const start = ta.selectionStart ?? body.length;
+    const end = ta.selectionEnd ?? body.length;
+    const next = (body.slice(0, start) + insert + body.slice(end)).slice(0, 500);
+    setBody(next);
+    requestAnimationFrame(() => {
+      ta.focus();
+      const pos = Math.min(start + insert.length, next.length);
+      ta.setSelectionRange(pos, pos);
+    });
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
@@ -230,17 +248,65 @@ function WallSection({ meId, isAdmin }: { meId?: string; isAdmin: boolean }) {
 
       <Card className="p-4 space-y-3">
         <Textarea
+          ref={taRef}
           value={body}
           onChange={(e) => setBody(e.target.value)}
-          placeholder="Skriv något smart, smutskasta en rival eller hyll en favorit…"
+          placeholder="Skriv något smart, smutskasta en rival eller hyll en favorit… 🎉"
           rows={2}
           maxLength={500}
           className="resize-none"
         />
-        <div className="flex items-center justify-between">
-          <span className={`text-xs ${tooLong ? "text-destructive" : "text-muted-foreground"}`}>
-            {text.length}/500
-          </span>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button type="button" size="sm" variant="ghost" className="h-8 px-2 text-muted-foreground hover:text-primary" aria-label="Add emoji">
+                  <Smile className="h-4 w-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="p-0 w-auto border-none shadow-xl">
+                <Suspense fallback={<div className="p-6 text-xs text-muted-foreground">Laddar…</div>}>
+                  <EmojiPicker
+                    onEmojiClick={(e) => insertAtCursor(e.emoji)}
+                    width={320}
+                    height={380}
+                    searchPlaceholder="Sök emoji…"
+                    previewConfig={{ showPreview: false }}
+                  />
+                </Suspense>
+              </PopoverContent>
+            </Popover>
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button type="button" size="sm" variant="ghost" className="h-8 px-2 text-muted-foreground hover:text-primary" aria-label="Add flag">
+                  <Flag className="h-4 w-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="p-2 w-64">
+                <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2 px-1">
+                  Snabbflaggor
+                </div>
+                <div className="grid grid-cols-8 gap-1">
+                  {QUICK_FLAGS.map((f) => (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => insertAtCursor(f)}
+                      className="text-xl h-8 w-8 grid place-items-center rounded hover:bg-muted transition-colors"
+                      aria-label={`Insert ${f}`}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            <span className={`text-xs ml-2 ${tooLong ? "text-destructive" : "text-muted-foreground"}`}>
+              {text.length}/500
+            </span>
+          </div>
           <Button
             size="sm"
             onClick={() => post.mutate(text)}
