@@ -222,7 +222,7 @@ function PredictionStateBadge({ state }: { state: PState }) {
 function TeamSide({ team, align }: { team: Team; align: "left" | "right" }) {
   return (
     <div className={`flex items-center gap-2 ${align === "right" ? "justify-end flex-row-reverse" : "justify-start"}`}>
-      <span className="text-3xl leading-none">{team.flag_emoji}</span>
+      <TeamFlag code={team.code} name={team.name} size="xl" />
       <div className={align === "right" ? "text-right" : ""}>
         <div className="font-semibold leading-tight">{team.name}</div>
         <div className="text-xs text-muted-foreground font-mono">{team.code}</div>
