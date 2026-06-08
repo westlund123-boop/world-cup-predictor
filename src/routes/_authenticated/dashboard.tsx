@@ -75,31 +75,35 @@ function Dashboard() {
         </div>
 
         {/* Top brand bar */}
-        <div className="relative flex items-center justify-between gap-4 px-6 md:px-10 pt-5">
+        <div className="relative flex items-center justify-between gap-4 px-6 md:px-10 pt-6">
           <div className="inline-flex items-center gap-2 text-[10px] md:text-[11px] uppercase tracking-[0.22em] text-primary-foreground/90 font-semibold bg-primary-foreground/10 backdrop-blur px-3 py-1.5 rounded-full">
             <Sparkles className="h-3 w-3" /> World Cup Betting for Aumovio AB
           </div>
-          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-primary-foreground/70 font-medium">
-            <span className="hidden sm:inline">presented by</span>
+        </div>
+
+        {/* Hero content with prominent logo */}
+        <div className="relative grid md:grid-cols-[1fr_auto] items-center gap-6 px-6 md:px-10 pt-5 pb-8 md:pb-10">
+          <div>
+            <h1 className="text-3xl md:text-5xl font-bold tracking-tight">
+              Hej {me?.profile?.name?.split(" ")[0] ?? "spelare"}!{" "}
+              <span className="inline-block animate-wave origin-[70%_70%]">👋</span>
+            </h1>
+            <p className="text-primary-foreground/90 mt-2 text-base md:text-lg max-w-xl">
+              {openWithoutPred > 0
+                ? `Du har ${openWithoutPred} öppen match${openWithoutPred === 1 ? "" : "er"} kvar att tippa. Lycka till! 🍀`
+                : "Allt tippat — luta dig tillbaka och håll tummarna. 🤞"}
+            </p>
+          </div>
+          <div className="flex flex-col items-end gap-2">
+            <span className="text-[10px] uppercase tracking-[0.22em] text-primary-foreground/70 font-medium">
+              Presented by
+            </span>
             <img
               src={aumovioLogo.url}
               alt="Aumovio AB"
-              className="h-5 md:h-6 w-auto rounded-sm"
+              className="h-14 md:h-20 lg:h-24 w-auto rounded-md drop-shadow-lg"
             />
           </div>
-        </div>
-
-        {/* Hero greeting */}
-        <div className="relative px-6 md:px-10 pt-6 pb-8 md:pb-10">
-          <h1 className="text-3xl md:text-5xl font-bold tracking-tight">
-            Hej {me?.profile?.name?.split(" ")[0] ?? "spelare"}!{" "}
-            <span className="inline-block animate-wave origin-[70%_70%]">👋</span>
-          </h1>
-          <p className="text-primary-foreground/90 mt-2 text-base md:text-lg max-w-xl">
-            {openWithoutPred > 0
-              ? `Du har ${openWithoutPred} öppen match${openWithoutPred === 1 ? "" : "er"} kvar att tippa. Lycka till! 🍀`
-              : "Allt tippat — luta dig tillbaka och håll tummarna. 🤞"}
-          </p>
         </div>
       </section>
 
