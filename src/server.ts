@@ -1,4 +1,8 @@
 import "./lib/error-capture";
+import "./lib/admin.functions";
+import "./lib/api/example.functions";
+import "./lib/news.functions";
+import "./lib/wc.functions";
 
 import { createStartHandler, defaultStreamHandler } from "@tanstack/react-start/server";
 import { consumeLastCapturedError } from "./lib/error-capture";
