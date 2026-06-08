@@ -84,7 +84,7 @@
   --input: oklch(0.92 0.008 60);
   --ring: oklch(0.68 0.21 38);
   --gradient-primary: linear-gradient(135deg, oklch(0.68 0.21 38), oklch(0.78 0.17 55));
-  --gradient-hero: linear-gradient(135deg, oklch(0.68 0.21 38) 0%, oklch(0.72 0.2 48) 50%, oklch(0.78 0.17 55) 100%);
+  --gradient-hero: linear-gradient(115deg, #ff7a1a 0%, #ff5a2c 35%, #e8407a 65%, #6a2da8 100%);
   --shadow-elegant: 0 10px 40px -10px color-mix(in oklab, oklch(0.68 0.21 38) 30%, transparent);
   --shadow-card: 0 1px 3px 0 oklch(0 0 0 / 0.05), 0 1px 2px -1px oklch(0 0 0 / 0.05);
   --chart-1: oklch(0.68 0.21 38);
