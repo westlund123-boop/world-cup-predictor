@@ -1,14 +1,10 @@
 import "./lib/error-capture";
 
-import serverEntry from "@tanstack/react-start/server-entry";
+import { createStartHandler, defaultStreamHandler } from "@tanstack/react-start/server";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 
-type ServerEntry = {
-  fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
-};
-
-const handler = serverEntry as unknown as ServerEntry;
+const handler = createStartHandler(defaultStreamHandler);
 
 function errorMessage(err: unknown): string {
   if (!err) return "unknown error";
@@ -56,7 +52,7 @@ async function normalizeCatastrophicSsrResponse(request: Request, response: Resp
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
-      const response = await handler.fetch(request, env, ctx);
+      const response = await handler(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(request, response);
     } catch (error) {
       const msg = errorMessage(error);
