@@ -31,10 +31,8 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
 });
 
-export const Route = createFileRoute("/_authenticated/dashboard")({
-  head: () => ({ meta: [{ title: "Dashboard — WC 2026 Predictor" }] }),
-  component: Dashboard,
-});
+
+
 
 function Dashboard() {
   const mFn = useServerFn(getMatches);
