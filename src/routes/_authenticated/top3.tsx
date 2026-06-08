@@ -73,7 +73,7 @@ function Top3Page() {
         <PodiumPick
           icon={<Trophy className="h-5 w-5 text-primary" />}
           title="🥇 World Cup winner"
-          points="20 pts"
+          points="50 pts"
           value={winner}
           onChange={setWinner}
           teams={teams}
@@ -83,7 +83,7 @@ function Top3Page() {
         <PodiumPick
           icon={<Medal className="h-5 w-5" />}
           title="🥈 Runner-up"
-          points="15 pts"
+          points="25 pts"
           value={runner}
           onChange={setRunner}
           teams={teams}
@@ -93,7 +93,7 @@ function Top3Page() {
         <PodiumPick
           icon={<Award className="h-5 w-5" />}
           title="🥉 Third place"
-          points="10 pts"
+          points="15 pts"
           value={third}
           onChange={setThird}
           teams={teams}
