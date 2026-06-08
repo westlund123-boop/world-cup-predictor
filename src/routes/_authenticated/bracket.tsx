@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { matchStatus, predictedWinner } from "@/lib/scoring";
 import { Lock, CheckCircle2, Clock, Sparkles } from "lucide-react";
+import { TeamFlag } from "@/components/TeamFlag";
 
 export const Route = createFileRoute("/_authenticated/bracket")({
   head: () => ({ meta: [{ title: "Knockout bracket — WC 2026 Predictor" }] }),

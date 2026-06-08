@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { STAGE_LABEL, matchStatus } from "@/lib/scoring";
 import { CheckCircle2, Clock, Lock, Pencil } from "lucide-react";
+import { TeamFlag } from "@/components/TeamFlag";
 
 export const Route = createFileRoute("/_authenticated/my-predictions")({
   head: () => ({ meta: [{ title: "My predictions — WC 2026 Predictor" }] }),
