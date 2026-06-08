@@ -5,6 +5,7 @@ import {
   scoreMatchPrediction,
   scoreGoalscorers,
   scoreTop3,
+  scoreTopScorerLeague,
   knockoutPointsForStage,
   predictedWinner,
 } from "./scoring";
