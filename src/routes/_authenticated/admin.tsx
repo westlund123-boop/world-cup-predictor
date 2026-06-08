@@ -564,6 +564,20 @@ function ResultDialog({
             </div>
           </div>
 
+          {status === "finished" && needsWinner && !winner && (
+            <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
+              <CircleAlert className="h-4 w-4 shrink-0 mt-0.5" />
+              <div>
+                <div className="font-semibold">Winner required</div>
+                <div className="mt-0.5 text-destructive/90">
+                  This is a knockout match ending in a draw. Pick the winner (the team that
+                  advanced after extra time / penalties) below — otherwise the bracket cannot
+                  auto-advance and the save will be rejected.
+                </div>
+              </div>
+            </div>
+          )}
+
           {status === "finished" && (
             <div>
               <Label>
