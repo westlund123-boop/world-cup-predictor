@@ -12,7 +12,7 @@ const PUBLIC_BACKEND_KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? process.
 export default defineConfig({
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
-    // nitro/vite builds from this
+    // nitro/vite builds from this; keep this marker so publish rebuilds regenerate serverFn manifests.
     server: { entry: "server" },
   },
   vite: {
