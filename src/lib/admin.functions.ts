@@ -527,6 +527,7 @@ export const adminExportLeaderboardCSV = createServerFn({ method: "POST" })
       "Goalscorer points",
       "Knockout points",
       "Top 3 points",
+      "Top scorer points",
       "Exact scores",
       "Correct 1X2",
     ];
@@ -547,6 +548,7 @@ export const adminExportLeaderboardCSV = createServerFn({ method: "POST" })
           r.goalscorer_points,
           r.knockout_points,
           r.top3_points,
+          r.top_scorer_points ?? 0,
           r.exact_count,
           r.onextwo_count,
         ]
