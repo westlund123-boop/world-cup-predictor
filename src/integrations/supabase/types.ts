@@ -22,6 +22,7 @@ export type Database = {
           match_points: number
           onextwo_count: number
           predictions_made: number
+          top_scorer_points: number
           top3_points: number
           top3_submitted_at: string | null
           total: number
@@ -35,6 +36,7 @@ export type Database = {
           match_points?: number
           onextwo_count?: number
           predictions_made?: number
+          top_scorer_points?: number
           top3_points?: number
           top3_submitted_at?: string | null
           total?: number
@@ -48,6 +50,7 @@ export type Database = {
           match_points?: number
           onextwo_count?: number
           predictions_made?: number
+          top_scorer_points?: number
           top3_points?: number
           top3_submitted_at?: string | null
           total?: number
@@ -355,6 +358,66 @@ export type Database = {
           group_letter?: string | null
           id?: string
           name?: string
+        }
+        Relationships: []
+      }
+      top_scorer_prediction_picks: {
+        Row: {
+          created_at: string
+          player_id: string
+          rank: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          player_id: string
+          rank: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          player_id?: string
+          rank?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "top_scorer_prediction_picks_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "top_scorer_prediction_picks_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "top_scorer_predictions"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      top_scorer_predictions: {
+        Row: {
+          created_at: string
+          points: number
+          submitted_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          points?: number
+          submitted_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          points?: number
+          submitted_at?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
