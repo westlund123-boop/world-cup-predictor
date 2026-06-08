@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useRef, useState, lazy, Suspense } from "react";
 import {
   getMatches, getTeams, getMyPredictions, getLeaderboard, getMyProfile,
   getWallMessages, postWallMessage, deleteWallMessage,
@@ -10,12 +10,26 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { TeamFlag } from "@/components/TeamFlag";
 import { matchStatus, STAGE_LABEL } from "@/lib/scoring";
-import { Trophy, Target, TrendingUp, Calendar, ArrowRight, MessageSquare, Trash2, Send, Sparkles } from "lucide-react";
+import { Trophy, Target, TrendingUp, Calendar, ArrowRight, MessageSquare, Trash2, Send, Sparkles, Smile, Flag } from "lucide-react";
 import { toast } from "sonner";
 import aumovioLogo from "@/assets/aumovio-logo.svg.asset.json";
 import { NewsPanel } from "@/components/NewsPanel";
+
+// Lazy so the ~200kb emoji bundle never blocks initial dashboard render.
+const EmojiPicker = lazy(() => import("emoji-picker-react"));
+
+const QUICK_FLAGS = [
+  "🇸🇪","🇳🇴","🇩🇰","🇫🇮","🇩🇪","🇪🇸","🇫🇷","🇮🇹","🇬🇧","🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+  "🇧🇷","🇦🇷","🇵🇹","🇳🇱","🇧🇪","🇭🇷","🇺🇸","🇲🇽","🇯🇵","🇰🇷",
+];
+
+export const Route = createFileRoute("/_authenticated/dashboard")({
+  head: () => ({ meta: [{ title: "Dashboard — WC 2026 Predictor" }] }),
+  component: Dashboard,
+});
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — WC 2026 Predictor" }] }),
