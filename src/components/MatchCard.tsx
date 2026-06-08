@@ -152,7 +152,7 @@ export function MatchCard({
         </div>
 
         <div>
-          <Label className="text-xs uppercase tracking-wider text-muted-foreground">First goalscorer (+4 pts)</Label>
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground">First goalscorer (+10 pts)</Label>
           <PlayerCombobox
             disabled={locked}
             value={firstScorer}
