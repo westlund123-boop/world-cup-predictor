@@ -168,6 +168,8 @@ function Dashboard() {
             <QuickLink to="/leaderboard" label="Leaderboard" />
             <QuickLink to="/rules" label="Rules" />
           </div>
+
+          <NewsPanel />
         </div>
       </section>
     </div>
