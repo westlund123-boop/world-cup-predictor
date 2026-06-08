@@ -51,8 +51,10 @@ async function normalizeCatastrophicSsrResponse(request: Request, response: Resp
 
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
+    void env;
+    void ctx;
     try {
-      const response = await handler(request, env, ctx);
+      const response = await handler(request);
       return await normalizeCatastrophicSsrResponse(request, response);
     } catch (error) {
       const msg = errorMessage(error);
