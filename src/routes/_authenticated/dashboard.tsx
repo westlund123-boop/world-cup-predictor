@@ -1,13 +1,19 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { useState } from "react";
 import {
   getMatches, getTeams, getMyPredictions, getLeaderboard, getMyProfile,
+  getWallMessages, postWallMessage, deleteWallMessage,
 } from "@/lib/wc.functions";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { TeamFlag } from "@/components/TeamFlag";
 import { matchStatus, STAGE_LABEL } from "@/lib/scoring";
-import { Trophy, Target, TrendingUp, Calendar, ArrowRight } from "lucide-react";
+import { Trophy, Target, TrendingUp, Calendar, ArrowRight, MessageSquare, Trash2, Send } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — WC 2026 Predictor" }] }),
@@ -90,11 +96,11 @@ function Dashboard() {
                       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
                         <div className="flex items-center gap-2 justify-end">
                           <span className="font-medium">{home?.name}</span>
-                          <span className="text-2xl">{home?.flag_emoji}</span>
+                          <TeamFlag code={home?.code} name={home?.name} size="lg" />
                         </div>
                         <div className="text-xs uppercase tracking-wider text-muted-foreground">vs</div>
                         <div className="flex items-center gap-2 justify-start">
-                          <span className="text-2xl">{away?.flag_emoji}</span>
+                          <TeamFlag code={away?.code} name={away?.name} size="lg" />
                           <span className="font-medium">{away?.name}</span>
                         </div>
                       </div>
@@ -111,6 +117,10 @@ function Dashboard() {
               })}
             </div>
           )}
+
+          <div className="pt-2">
+            <WallSection meId={me?.profile?.id} isAdmin={me?.isAdmin ?? false} />
+          </div>
         </div>
 
         <div className="space-y-3">
@@ -138,6 +148,111 @@ function Dashboard() {
           </div>
         </div>
       </section>
+    </div>
+  );
+}
+
+function WallSection({ meId, isAdmin }: { meId?: string; isAdmin: boolean }) {
+  const qc = useQueryClient();
+  const listFn = useServerFn(getWallMessages);
+  const postFn = useServerFn(postWallMessage);
+  const delFn = useServerFn(deleteWallMessage);
+  const [body, setBody] = useState("");
+
+  const { data: messages = [] } = useQuery({
+    queryKey: ["wall"],
+    queryFn: () => listFn(),
+    refetchInterval: 30_000,
+  });
+
+  const post = useMutation({
+    mutationFn: (text: string) => postFn({ data: { body: text } }),
+    onSuccess: () => { setBody(""); qc.invalidateQueries({ queryKey: ["wall"] }); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const del = useMutation({
+    mutationFn: (id: string) => delFn({ data: { id } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["wall"] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const text = body.trim();
+  const tooLong = text.length > 500;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <MessageSquare className="h-4 w-4 text-primary" />
+        <h2 className="text-lg font-semibold">Klotterplank</h2>
+        <span className="text-xs text-muted-foreground">— prata med dina medspelare</span>
+      </div>
+
+      <Card className="p-4 space-y-3">
+        <Textarea
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          placeholder="Skriv något smart, smutskasta en rival eller hyll en favorit…"
+          rows={2}
+          maxLength={500}
+          className="resize-none"
+        />
+        <div className="flex items-center justify-between">
+          <span className={`text-xs ${tooLong ? "text-destructive" : "text-muted-foreground"}`}>
+            {text.length}/500
+          </span>
+          <Button
+            size="sm"
+            onClick={() => post.mutate(text)}
+            disabled={post.isPending || text.length === 0 || tooLong}
+          >
+            <Send className="h-3.5 w-3.5 mr-1.5" />
+            {post.isPending ? "Posting…" : "Post"}
+          </Button>
+        </div>
+      </Card>
+
+      <Card className="divide-y divide-border overflow-hidden">
+        {messages.length === 0 ? (
+          <div className="p-6 text-sm text-muted-foreground text-center">
+            No messages yet. Be the first to scribble on the wall.
+          </div>
+        ) : (
+          messages.map((m: any) => {
+            const canDelete = isAdmin || m.author_id === meId;
+            return (
+              <div key={m.id} className="p-4 flex items-start gap-3">
+                <div className="h-8 w-8 rounded-full bg-muted shrink-0 flex items-center justify-center text-xs font-semibold text-muted-foreground overflow-hidden">
+                  {m.author_avatar
+                    ? <img src={m.author_avatar} alt="" className="h-full w-full object-cover" />
+                    : (m.author_name?.[0]?.toUpperCase() ?? "?")}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">{m.author_name}</span>
+                    <span>·</span>
+                    <time dateTime={m.created_at}>
+                      {new Date(m.created_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+                    </time>
+                  </div>
+                  <p className="text-sm mt-1 whitespace-pre-wrap break-words">{m.body}</p>
+                </div>
+                {canDelete && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-muted-foreground hover:text-destructive"
+                    onClick={() => del.mutate(m.id)}
+                    disabled={del.isPending}
+                    aria-label="Delete message"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+            );
+          })
+        )}
+      </Card>
     </div>
   );
 }

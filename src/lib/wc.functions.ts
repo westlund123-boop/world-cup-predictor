@@ -236,3 +236,53 @@ export const updateMyProfile = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+// ---------- Wall messages (klotterplank) ----------
+
+export const getWallMessages = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase } = context;
+    const { data: msgs, error } = await supabase
+      .from("wall_messages")
+      .select("id,author_id,body,created_at")
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (error) throw new Error(error.message);
+
+    const authorIds = Array.from(new Set((msgs ?? []).map((m) => m.author_id)));
+    const { data: profiles } = authorIds.length
+      ? await supabase.from("profiles").select("id,name,avatar_url").in("id", authorIds)
+      : { data: [] as { id: string; name: string | null; avatar_url: string | null }[] };
+    const pmap = new Map((profiles ?? []).map((p) => [p.id, p]));
+
+    return (msgs ?? []).map((m) => ({
+      ...m,
+      author_name: pmap.get(m.author_id)?.name ?? "Anonymous",
+      author_avatar: pmap.get(m.author_id)?.avatar_url ?? null,
+    }));
+  });
+
+const WallInput = z.object({ body: z.string().trim().min(1).max(500) });
+
+export const postWallMessage = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => WallInput.parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { error } = await supabase
+      .from("wall_messages")
+      .insert({ author_id: userId, body: data.body });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const deleteWallMessage = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { error } = await supabase.from("wall_messages").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
