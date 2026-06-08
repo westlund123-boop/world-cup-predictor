@@ -127,8 +127,10 @@ function RootComponent() {
       <AuthInvalidator />
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
+      <Toaster />
     </QueryClientProvider>
   );
+
 }
 
 function AuthInvalidator() {
