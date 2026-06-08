@@ -320,6 +320,9 @@ function AdminInner() {
           onSaved={() => {
             qc.invalidateQueries({ queryKey: ["admin-matches"] });
             qc.invalidateQueries({ queryKey: ["matches"] });
+            qc.invalidateQueries({ queryKey: ["leaderboard"] });
+            qc.invalidateQueries({ queryKey: ["leaderboard-cache"] });
+            qc.invalidateQueries({ queryKey: ["myPredictions"] });
           }}
         />
       )}
