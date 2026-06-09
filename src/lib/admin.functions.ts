@@ -570,7 +570,8 @@ export const adminGetAllPlayers = createServerFn({ method: "GET" })
       .from("players")
       .select("id,team_id,name,name_on_shirt,position,shirt_number,club,active")
       .order("team_id")
-      .order("shirt_number", { ascending: true, nullsFirst: false });
+      .order("shirt_number", { ascending: true, nullsFirst: false })
+      .limit(5000);
     if (error) throw new Error(error.message);
     return data ?? [];
   });
