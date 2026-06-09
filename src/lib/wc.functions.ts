@@ -34,7 +34,8 @@ export const getPlayers = createServerFn({ method: "GET" }).handler(async () => 
     .select("id,team_id,name,name_on_shirt,position,shirt_number,club,active")
     .eq("active", true)
     .order("shirt_number", { ascending: true, nullsFirst: false })
-    .order("name");
+    .order("name")
+    .limit(5000);
   if (error) throw new Error(error.message);
   return data ?? [];
 });
