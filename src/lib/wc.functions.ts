@@ -299,7 +299,7 @@ export const getTopScorerStandings = createServerFn({ method: "GET" }).handler(a
   const [{ data: scorers, error: sErr }, { data: matches, error: mErr }, { data: players, error: pErr }] = await Promise.all([
     supabaseAdmin.from("match_goalscorers").select("match_id,player_id"),
     supabaseAdmin.from("matches").select("id,status"),
-    supabaseAdmin.from("players").select("id,name,name_on_shirt,team_id,shirt_number,position"),
+    supabaseAdmin.from("players").select("id,name,name_on_shirt,team_id,shirt_number,position").limit(5000),
   ]);
   if (sErr) throw new Error(sErr.message);
   if (mErr) throw new Error(mErr.message);
