@@ -311,8 +311,8 @@ function MatchPreviewSection({ matchId, homeName, awayName }: { matchId: string;
 
           {preview && (
             <>
-              <div className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed [&_p]:my-1 [&_ul]:my-1 [&_strong]:text-foreground">
-                <ReactMarkdown>{preview.content}</ReactMarkdown>
+              <div className="text-sm leading-relaxed space-y-1">
+                <SimpleMarkdown text={preview.content} />
               </div>
               <div className="flex items-center justify-between pt-1 text-[10px] text-muted-foreground">
                 <span className="italic">AI-genererad, bara för skoj</span>
