@@ -8,12 +8,14 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useServerFn } from "@tanstack/react-start";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { upsertPrediction } from "@/lib/wc.functions";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { upsertPrediction, getMyProfile } from "@/lib/wc.functions";
+import { getMatchPreview, ensureMatchPreview, regenerateMatchPreview } from "@/lib/match-preview.functions";
 import { matchStatus, STAGE_LABEL, outcomeOf } from "@/lib/scoring";
 import { toast } from "sonner";
-import { Lock, CheckCircle2, Pencil, CircleDashed, Radio, ChevronsUpDown, Check, X, AlertTriangle } from "lucide-react";
+import { Lock, CheckCircle2, Pencil, CircleDashed, Radio, ChevronsUpDown, Check, X, AlertTriangle, Sparkles, ChevronDown, RefreshCw, Loader2 } from "lucide-react";
 import { TeamFlag } from "@/components/TeamFlag";
+import ReactMarkdown from "react-markdown";
 
 type Team = { id: string; name: string; code: string; flag_emoji: string | null; group_letter: string | null };
 type Match = {
@@ -214,6 +216,8 @@ export function MatchCard({
           </div>
         )}
 
+        <MatchPreviewSection matchId={match.id} homeName={home.name} awayName={away.name} />
+
         {!locked && (
           <Button
             onClick={() => save.mutate()}
@@ -229,6 +233,108 @@ export function MatchCard({
         )}
       </div>
     </Card>
+  );
+}
+
+function MatchPreviewSection({ matchId, homeName, awayName }: { matchId: string; homeName: string; awayName: string }) {
+  const [open, setOpen] = useState(false);
+  const qc = useQueryClient();
+  const getFn = useServerFn(getMatchPreview);
+  const ensureFn = useServerFn(ensureMatchPreview);
+  const regenFn = useServerFn(regenerateMatchPreview);
+  const profileFn = useServerFn(getMyProfile);
+
+  const { data: profile } = useQuery({ queryKey: ["myProfile"], queryFn: () => profileFn() });
+  const isAdmin = !!profile?.isAdmin;
+
+  const previewQ = useQuery({
+    queryKey: ["matchPreview", matchId],
+    queryFn: () => getFn({ data: { match_id: matchId } }),
+    enabled: open,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const ensure = useMutation({
+    mutationFn: () => ensureFn({ data: { match_id: matchId } }),
+    onSuccess: (data) => qc.setQueryData(["matchPreview", matchId], data),
+    onError: (e: Error) => toast.error("Kunde inte skapa förhandsanalys", { description: e.message }),
+  });
+
+  const regen = useMutation({
+    mutationFn: () => regenFn({ data: { match_id: matchId } }),
+    onSuccess: (data) => {
+      qc.setQueryData(["matchPreview", matchId], data);
+      toast.success("Förhandsanalys uppdaterad");
+    },
+    onError: (e: Error) => toast.error("Kunde inte uppdatera", { description: e.message }),
+  });
+
+  const preview = previewQ.data;
+  const loading = previewQ.isLoading || ensure.isPending;
+
+  return (
+    <div className="border border-border rounded-md">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium hover:bg-muted/40 transition-colors rounded-md"
+      >
+        <span className="flex items-center gap-2">
+          <Sparkles className="h-3.5 w-3.5 text-primary" />
+          Förhandsanalys
+        </span>
+        <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="px-3 pb-3 pt-1 space-y-2 border-t border-border">
+          {loading && !preview && (
+            <div className="flex items-center gap-2 py-3 text-xs text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Hämtar färsk info om {homeName} och {awayName}…
+            </div>
+          )}
+
+          {!loading && !preview && (
+            <div className="py-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={() => ensure.mutate()}
+                disabled={ensure.isPending}
+                className="w-full"
+              >
+                {ensure.isPending ? "Genererar…" : "Generera förhandsanalys"}
+              </Button>
+            </div>
+          )}
+
+          {preview && (
+            <>
+              <div className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed [&_p]:my-1 [&_ul]:my-1 [&_strong]:text-foreground">
+                <ReactMarkdown>{preview.content}</ReactMarkdown>
+              </div>
+              <div className="flex items-center justify-between pt-1 text-[10px] text-muted-foreground">
+                <span className="italic">AI-genererad, bara för skoj</span>
+                {isAdmin && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 px-2 text-xs"
+                    onClick={() => regen.mutate()}
+                    disabled={regen.isPending}
+                  >
+                    <RefreshCw className={`h-3 w-3 mr-1 ${regen.isPending ? "animate-spin" : ""}`} />
+                    Regenerera
+                  </Button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
