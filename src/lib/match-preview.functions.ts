@@ -66,8 +66,12 @@ async function generateWithGemini(homeName: string, awayName: string, kickoffISO
   const key = process.env.LOVABLE_API_KEY;
   if (!key) throw new Error("LOVABLE_API_KEY missing");
 
-  const system = `Du är en sportreporter som skriver korta, lekfulla matchförhandsanalyser på svenska för fotbolls-VM 2026. 
-KRITISKT: Använd ENDAST fakta från "Webbsökningsresultat" nedan. Om du inte hittar verifierbara fakta om något, hoppa över det helt. Hitta INTE på statistik, formresultat, skador eller annat. Skriv inga vinstodds eller procentuella sannolikheter.`;
+  const system = `Du är en datadriven sportreporter som skriver korta, lekfulla men faktatäta matchförhandsanalyser på svenska för fotbolls-VM 2026.
+KRITISKA REGLER:
+- Använd ENDAST fakta från "Webbsökningsresultat" nedan. Hitta ALDRIG på siffror, resultat, mål eller spelare.
+- Prioritera VERIFIERBARA SIFFROR (formresultat, målantal, kvalmål) framför adjektiv och svepande fraser.
+- Om du saknar data för en sektion, HOPPA ÖVER hela sektionen — fyll ALDRIG ut med generiska fraser som "genomför slutliga förberedelser", "ser fram emot matchen" eller liknande fluff.
+- Skriv inga vinstodds eller procentuella sannolikheter.`;
 
   const user = `Match: ${homeName} vs ${awayName}
 Avspark: ${kickoffISO}
@@ -75,20 +79,19 @@ Avspark: ${kickoffISO}
 Webbsökningsresultat (din enda källa till fakta):
 ${evidence || "(inga sökresultat tillgängliga)"}
 
-Skriv en förhandsanalys på svenska enligt EXAKT detta format (max 120 ord totalt):
+Skriv en förhandsanalys på svenska enligt EXAKT detta format (max 120 ord totalt). Hoppa över valfri sektion om du saknar verifierbara fakta för den:
 
-**Heta trender**
-- (kort punkt om något lag, endast om du har stöd i källorna)
-- (kort punkt)
-- (valfri tredje punkt)
+**Form**
+- ${homeName}: t.ex. "VVOFV (senaste 5)" — V=vinst, O=oavgjort, F=förlust. Visa bara så många matcher du faktiskt hittat resultat för (kan vara färre än 5).
+- ${awayName}: samma format.
 
-**Att hålla koll på**
-(1–2 nyckelspelare eller taktiska detaljer — endast om nämnda i källorna)
+**Heta namn**
+- 1–2 spelare per lag MED KONKRETA SIFFROR (t.ex. "Güler: 6 mål i kvalet", "Son: 3 mål senaste 4 landskamperna"). Hoppa över spelare där du saknar siffra — gissa aldrig.
 
 **Prediktion**
-(en lekfull enradare, ingen procentsiffra)
+En lekfull enradare (ingen procentsiffra).
 
-Ton: kvick, lätt humoristisk, men sansad. Om sökresultaten är tomma, skriv kort: "Inga färska nyheter hittades — vi får helt enkelt vänta och se!"`;
+Ton: kvick och lätt humoristisk, men varje påstående ska kunna backas upp av sökresultaten. Om sökresultaten är helt tomma, skriv kort: "Inga färska nyheter hittades — vi får helt enkelt vänta och se!"`;
 
   const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
@@ -135,8 +138,19 @@ async function generateAndStore(match_id: string): Promise<{ content: string; ge
   const home = teams?.find((t) => t.id === match.home_team_id)?.name ?? "Hemmalag";
   const away = teams?.find((t) => t.id === match.away_team_id)?.name ?? "Bortalag";
 
-  const query = `${home} vs ${away} World Cup 2026 form recent results injuries key players`;
-  const evidence = await firecrawlSearch(query);
+  const q1 = `${home} recent results last 5 matches 2025 2026 form W D L`;
+  const q2 = `${away} recent results last 5 matches 2025 2026 form W D L`;
+  const q3 = `${home} vs ${away} World Cup 2026 top scorers qualifying goals`;
+  const [e1, e2, e3] = await Promise.all([
+    firecrawlSearch(q1),
+    firecrawlSearch(q2),
+    firecrawlSearch(q3),
+  ]);
+  const evidence = [
+    `### ${home} – form/resultat\n${e1}`,
+    `### ${away} – form/resultat\n${e2}`,
+    `### Målskyttar / nyckelspelare\n${e3}`,
+  ].join("\n\n");
   const content = await generateWithGemini(home, away, match.kickoff_at, evidence);
 
   const { data: saved, error: sErr } = await supabaseAdmin
