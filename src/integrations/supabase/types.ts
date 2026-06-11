@@ -106,6 +106,32 @@ export type Database = {
           },
         ]
       }
+      match_previews: {
+        Row: {
+          content: string
+          generated_at: string
+          match_id: string
+        }
+        Insert: {
+          content: string
+          generated_at?: string
+          match_id: string
+        }
+        Update: {
+          content?: string
+          generated_at?: string
+          match_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_previews_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: true
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       matches: {
         Row: {
           away_score: number | null
