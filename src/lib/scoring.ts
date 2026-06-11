@@ -54,9 +54,11 @@ export function scoreMatchPrediction(
 }
 
 /**
- * Goalscorer points (capped at 20 / match).
- *  - +5 per other scorer correctly picked (player appears in actual scorers)
+ * Goalscorer points (max 15 per match):
  *  - +10 if first_scorer matches the actual first scorer
+ *  - +5 if the (single) other-scorer pick appears in the actual scorers
+ * Rule change: users may only pick ONE other goalscorer. If older data has
+ * more than one row stored, only the first matching pick is awarded.
  */
 export function scoreGoalscorers(
   pred: { first_scorer_player_id: string | null; scorer_ids: string[] },
@@ -73,10 +75,14 @@ export function scoreGoalscorers(
   const actualSet = new Set(actual.scorer_player_ids);
   for (const pid of pred.scorer_ids) {
     if (pid === pred.first_scorer_player_id) continue;
-    if (actualSet.has(pid)) pts += 5;
+    if (actualSet.has(pid)) {
+      pts += 5;
+      break; // award at most ONE other-scorer bonus per match
+    }
   }
-  return Math.min(pts, 20);
+  return Math.min(pts, 15);
 }
+
 
 /**
  * Knockout advancement points: based on the predicted winner team for a KO match.
