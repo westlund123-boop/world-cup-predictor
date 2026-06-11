@@ -14,7 +14,7 @@ export const Route = createFileRoute("/rules")({
 
 const basics = [
   { icon: ShieldCheck, title: "How to register", body: "Sign up with your work email, name, and department. You're in immediately — no approval step." },
-  { icon: Clock,       title: "Submitting predictions", body: "For every match, pick the outcome (1 / X / 2), the exact final score, the first goalscorer, and any other scorers. You can edit your pick any time before kickoff." },
+  { icon: Clock,       title: "Submitting predictions", body: "For every match, pick the outcome (1 / X / 2), the exact final score, the first goalscorer, and one other goalscorer. You can edit your pick any time before kickoff." },
   { icon: Lock,        title: "Lock time", body: "Predictions lock automatically at kickoff. After that your pick is read-only — no edits, no excuses." },
   { icon: Flag,        title: "Top 3 prediction", body: "Pick the champion, the silver medalist, and the bronze medalist. This must be submitted before the first knockout match kicks off." },
   { icon: ListOrdered, title: "Top Scorer League", body: "Build a ranked top-10 list of players you think will finish highest on the tournament's goalscorer chart. Locks at the first kickoff of the tournament." },
