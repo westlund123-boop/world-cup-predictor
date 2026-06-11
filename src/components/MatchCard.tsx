@@ -1,18 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { upsertPrediction } from "@/lib/wc.functions";
-import { matchStatus, STAGE_LABEL } from "@/lib/scoring";
+import { matchStatus, STAGE_LABEL, outcomeOf } from "@/lib/scoring";
 import { toast } from "sonner";
-import { Lock, CheckCircle2, Pencil, CircleDashed, Radio, ChevronsUpDown, Check, X } from "lucide-react";
+import { Lock, CheckCircle2, Pencil, CircleDashed, Radio, ChevronsUpDown, Check, X, AlertTriangle } from "lucide-react";
 import { TeamFlag } from "@/components/TeamFlag";
 
 type Team = { id: string; name: string; code: string; flag_emoji: string | null; group_letter: string | null };
@@ -25,9 +25,12 @@ type Player = { id: string; team_id: string; name: string; position: string | nu
 type Prediction = {
   id: string; match_id: string; outcome: string; home_score: number; away_score: number;
   first_scorer_player_id: string | null; points: number;
+  needs_repick?: boolean | null;
 };
 
 type PState = "not_predicted" | "saved" | "editing" | "locked" | "live" | "finished";
+
+const SCORE_OPTIONS = Array.from({ length: 11 }, (_, i) => i); // 0..10
 
 export function MatchCard({
   match, home, away, players, prediction, scorerIds,
@@ -38,11 +41,13 @@ export function MatchCard({
   const status = matchStatus(match.kickoff_at, match.status);
   const locked = status !== "open";
 
-  const [outcome, setOutcome] = useState<"1" | "X" | "2">((prediction?.outcome as any) ?? "1");
-  const [hs, setHs] = useState<number>(prediction?.home_score ?? 1);
-  const [as_, setAs] = useState<number>(prediction?.away_score ?? 0);
+  // No silent default any more — null until user picks.
+  const [outcome, setOutcome] = useState<"1" | "X" | "2" | null>((prediction?.outcome as any) ?? null);
+  const [hs, setHs] = useState<number | null>(prediction?.home_score ?? null);
+  const [as_, setAs] = useState<number | null>(prediction?.away_score ?? null);
   const [firstScorer, setFirstScorer] = useState<string | null>(prediction?.first_scorer_player_id ?? null);
-  const [scorers, setScorers] = useState<string[]>(scorerIds);
+  // Single other scorer only.
+  const [otherScorer, setOtherScorer] = useState<string | null>(scorerIds[0] ?? null);
   const [dirty, setDirty] = useState(false);
 
   const homeSquad = players.filter((p) => p.team_id === home.id);
@@ -51,17 +56,21 @@ export function MatchCard({
   const qc = useQueryClient();
   const fn = useServerFn(upsertPrediction);
   const save = useMutation({
-    mutationFn: () =>
-      fn({
+    mutationFn: () => {
+      if (hs == null || as_ == null || !outcome) {
+        throw new Error("Pick a score and outcome first");
+      }
+      return fn({
         data: {
           match_id: match.id,
           outcome,
           home_score: hs,
           away_score: as_,
           first_scorer_player_id: firstScorer,
-          scorer_ids: scorers,
+          scorer_ids: otherScorer ? [otherScorer] : [],
         },
-      }),
+      });
+    },
     onSuccess: () => {
       toast.success("Prediction saved", { description: `${home.name} vs ${away.name}` });
       setDirty(false);
@@ -87,7 +96,19 @@ export function MatchCard({
 
   const kickoff = useMemo(() => new Date(match.kickoff_at), [match.kickoff_at]);
 
-  const onChange = <T,>(setter: (v: T) => void) => (v: T) => { setter(v); setDirty(true); };
+  const showRepickNotice = !locked && !!prediction?.needs_repick && !dirty;
+
+  // Auto-sync 1X2 toggle from the score when the user changes the score.
+  const setHomeScore = (n: number) => {
+    setHs(n); setDirty(true);
+    if (as_ != null) setOutcome(outcomeOf(n, as_));
+  };
+  const setAwayScore = (n: number) => {
+    setAs(n); setDirty(true);
+    if (hs != null) setOutcome(outcomeOf(hs, n));
+  };
+
+  const canSave = !locked && hs != null && as_ != null && !!outcome && (dirty || !prediction);
 
   return (
     <Card className="overflow-hidden">
@@ -130,12 +151,19 @@ export function MatchCard({
           </div>
         )}
 
+        {showRepickNotice && (
+          <div className="flex items-start gap-2 px-3 py-2 rounded-md bg-amber-100 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 text-xs">
+            <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+            <span>Rules updated — only ONE other goalscorer is allowed now. Please re-pick your goalscorer and save.</span>
+          </div>
+        )}
+
         <div className="grid grid-cols-3 gap-1 p-1 bg-muted rounded-md">
           {(["1", "X", "2"] as const).map((opt) => (
             <button
               key={opt}
               disabled={locked}
-              onClick={() => onChange(setOutcome)(opt)}
+              onClick={() => { setOutcome(opt); setDirty(true); }}
               className={`py-2 rounded text-sm font-semibold transition-colors ${
                 outcome === opt ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
               } disabled:opacity-60 disabled:cursor-not-allowed`}
@@ -145,10 +173,10 @@ export function MatchCard({
           ))}
         </div>
 
-        <div className="flex items-center justify-center gap-3">
-          <ScoreInput value={hs} onChange={onChange(setHs)} disabled={locked} label={home.code} />
-          <span className="text-xl text-muted-foreground font-mono">–</span>
-          <ScoreInput value={as_} onChange={onChange(setAs)} disabled={locked} label={away.code} />
+        <div className="flex items-end justify-center gap-3">
+          <ScoreSelect value={hs} onChange={setHomeScore} disabled={locked} label={home.code} />
+          <span className="text-xl text-muted-foreground font-mono pb-3">–</span>
+          <ScoreSelect value={as_} onChange={setAwayScore} disabled={locked} label={away.code} />
         </div>
 
         <div>
@@ -156,7 +184,7 @@ export function MatchCard({
           <PlayerCombobox
             disabled={locked}
             value={firstScorer}
-            onChange={(v) => onChange(setFirstScorer)(v)}
+            onChange={(v) => { setFirstScorer(v); setDirty(true); }}
             home={home}
             away={away}
             homeSquad={homeSquad}
@@ -165,16 +193,17 @@ export function MatchCard({
           />
         </div>
 
-        <div className="space-y-2">
-          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Other goalscorers (5 pts each, max 20)</Label>
-          <ScorerMultiSelect
+        <div>
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Other goalscorer (5 pts)</Label>
+          <PlayerCombobox
             disabled={locked}
-            selected={scorers}
-            setSelected={onChange(setScorers)}
+            value={otherScorer}
+            onChange={(v) => { setOtherScorer(v); setDirty(true); }}
             home={home}
             away={away}
             homeSquad={homeSquad}
             awaySquad={awaySquad}
+            placeholder="Pick one other scorer…"
             excludeId={firstScorer}
           />
         </div>
@@ -188,7 +217,7 @@ export function MatchCard({
         {!locked && (
           <Button
             onClick={() => save.mutate()}
-            disabled={save.isPending || (!dirty && !!prediction)}
+            disabled={save.isPending || !canSave}
             className="w-full"
           >
             {save.isPending
@@ -232,18 +261,27 @@ function TeamSide({ team, align }: { team: Team; align: "left" | "right" }) {
   );
 }
 
-function ScoreInput({ value, onChange, disabled, label }: { value: number; onChange: (n: number) => void; disabled: boolean; label: string }) {
+function ScoreSelect({
+  value, onChange, disabled, label,
+}: { value: number | null; onChange: (n: number) => void; disabled: boolean; label: string }) {
   return (
     <div className="flex flex-col items-center">
-      <Input
-        type="number"
-        min={0}
-        max={20}
-        value={value}
+      <Select
+        value={value == null ? "" : String(value)}
+        onValueChange={(v) => onChange(parseInt(v, 10))}
         disabled={disabled}
-        onChange={(e) => onChange(Math.max(0, Math.min(20, parseInt(e.target.value || "0", 10))))}
-        className="w-16 text-center text-xl font-bold font-mono h-12"
-      />
+      >
+        <SelectTrigger className="w-20 h-12 text-xl font-bold font-mono justify-center">
+          <SelectValue placeholder="–" />
+        </SelectTrigger>
+        <SelectContent className="min-w-[5rem]">
+          {SCORE_OPTIONS.map((n) => (
+            <SelectItem key={n} value={String(n)} className="justify-center text-base font-mono">
+              {n}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
       <span className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1">{label}</span>
     </div>
   );
@@ -256,7 +294,7 @@ function formatPlayer(p: Player, teamCode: string) {
 }
 
 function PlayerCombobox({
-  value, onChange, disabled, home, away, homeSquad, awaySquad, placeholder,
+  value, onChange, disabled, home, away, homeSquad, awaySquad, placeholder, excludeId,
 }: {
   value: string | null;
   onChange: (v: string | null) => void;
@@ -264,12 +302,21 @@ function PlayerCombobox({
   home: Team; away: Team;
   homeSquad: Player[]; awaySquad: Player[];
   placeholder: string;
+  excludeId?: string | null;
 }) {
   const [open, setOpen] = useState(false);
+  const homeFiltered = useMemo(
+    () => homeSquad.filter((p) => p.id !== excludeId),
+    [homeSquad, excludeId],
+  );
+  const awayFiltered = useMemo(
+    () => awaySquad.filter((p) => p.id !== excludeId),
+    [awaySquad, excludeId],
+  );
   const all = useMemo(() => [
-    ...homeSquad.map((p) => ({ p, team: home })),
-    ...awaySquad.map((p) => ({ p, team: away })),
-  ], [homeSquad, awaySquad, home, away]);
+    ...homeFiltered.map((p) => ({ p, team: home })),
+    ...awayFiltered.map((p) => ({ p, team: away })),
+  ], [homeFiltered, awayFiltered, home, away]);
   const selected = all.find((x) => x.p.id === value);
 
   return (
@@ -311,7 +358,7 @@ function PlayerCombobox({
                 </CommandItem>
               </CommandGroup>
             )}
-            {[{ team: home, squad: homeSquad }, { team: away, squad: awaySquad }].map(({ team, squad }) => (
+            {[{ team: home, squad: homeFiltered }, { team: away, squad: awayFiltered }].map(({ team, squad }) => (
               <CommandGroup key={team.id} heading={`${team.flag_emoji ?? ""} ${team.name}`}>
                 {squad.map((p) => (
                   <CommandItem
@@ -333,101 +380,5 @@ function PlayerCombobox({
         </Command>
       </PopoverContent>
     </Popover>
-  );
-}
-
-function ScorerMultiSelect({
-  selected, setSelected, disabled, home, away, homeSquad, awaySquad, excludeId,
-}: {
-  selected: string[];
-  setSelected: (v: string[]) => void;
-  disabled: boolean;
-  home: Team; away: Team;
-  homeSquad: Player[]; awaySquad: Player[];
-  excludeId: string | null;
-}) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const all = useMemo(() => [
-    ...homeSquad.map((p) => ({ p, team: home })),
-    ...awaySquad.map((p) => ({ p, team: away })),
-  ].filter((x) => x.p.id !== excludeId), [homeSquad, awaySquad, home, away, excludeId]);
-  const selectedList = all.filter((x) => selected.includes(x.p.id));
-
-  const toggle = (id: string) => {
-    if (selected.includes(id)) setSelected(selected.filter((x) => x !== id));
-    else setSelected([...selected, id]);
-  };
-
-  return (
-    <div className="space-y-2">
-      {selectedList.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {selectedList.map(({ p, team }) => (
-            <Badge key={p.id} variant="secondary" className="font-normal pl-2 pr-1 gap-1">
-              <span>{team.flag_emoji}</span>
-              <span className="font-mono text-[10px] text-muted-foreground">
-                {p.shirt_number != null ? `#${p.shirt_number}` : ""}
-              </span>
-              <span>{p.name}</span>
-              {!disabled && (
-                <button
-                  type="button"
-                  onClick={() => toggle(p.id)}
-                  className="ml-0.5 rounded hover:bg-muted p-0.5"
-                  aria-label={`Remove ${p.name}`}
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-            </Badge>
-          ))}
-        </div>
-      )}
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={disabled}
-            className="w-full justify-between font-normal h-9 text-sm"
-          >
-            <span className="text-muted-foreground">
-              {selectedList.length === 0 ? "Add goalscorers…" : `Add more (${selectedList.length} selected)`}
-            </span>
-            <ChevronsUpDown className="h-3.5 w-3.5 opacity-50" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-          <Command>
-            <CommandInput placeholder="Search player or number…" value={query} onValueChange={setQuery} />
-            <CommandList className="max-h-64">
-              <CommandEmpty>No players found.</CommandEmpty>
-              {[{ team: home, squad: homeSquad }, { team: away, squad: awaySquad }].map(({ team, squad }) => (
-                <CommandGroup key={team.id} heading={`${team.flag_emoji ?? ""} ${team.name}`}>
-                  {squad.filter((p) => p.id !== excludeId).map((p) => {
-                    const checked = selected.includes(p.id);
-                    return (
-                      <CommandItem
-                        key={p.id}
-                        value={`${p.shirt_number ?? ""} ${p.name} ${p.position ?? ""} ${team.code}`}
-                        onSelect={() => toggle(p.id)}
-                      >
-                        <Check className={`h-3.5 w-3.5 mr-2 ${checked ? "opacity-100" : "opacity-0"}`} />
-                        <span className="font-mono text-xs text-muted-foreground w-7">
-                          {p.shirt_number != null ? `#${p.shirt_number}` : ""}
-                        </span>
-                        <span className="flex-1 truncate">{p.name}</span>
-                        {p.position && <span className="text-xs text-muted-foreground ml-2">{p.position}</span>}
-                      </CommandItem>
-                    );
-                  })}
-                </CommandGroup>
-              ))}
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
-    </div>
   );
 }
