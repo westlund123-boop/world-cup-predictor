@@ -139,8 +139,11 @@ function AuthInvalidator() {
     let active = true;
     import("@/integrations/supabase/client").then(({ supabase }) => {
       if (!active) return;
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-        router.invalidate();
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+        if (event === "INITIAL_SESSION") return;
+        window.setTimeout(() => {
+          router.invalidate();
+        }, 0);
       });
       (AuthInvalidator as any)._unsub = () => subscription.unsubscribe();
     });

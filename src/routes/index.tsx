@@ -25,13 +25,23 @@ function Landing() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
-      if (session) navigate({ to: "/dashboard", replace: true });
+    let active = true;
+    const redirectToDashboard = () => {
+      window.setTimeout(() => {
+        if (active) navigate({ to: "/dashboard", replace: true });
+      }, 0);
+    };
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "INITIAL_SESSION") return;
+      if (session) redirectToDashboard();
     });
     supabase.auth.getUser().then(({ data }) => {
-      if (data.user) navigate({ to: "/dashboard", replace: true });
+      if (data.user) redirectToDashboard();
     });
-    return () => subscription.unsubscribe();
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
   }, [navigate]);
 
   const submit = async (e: React.FormEvent) => {
