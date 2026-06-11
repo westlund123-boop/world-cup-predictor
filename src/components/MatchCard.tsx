@@ -488,3 +488,58 @@ function PlayerCombobox({
     </Popover>
   );
 }
+
+function renderInline(text: string, keyPrefix: string) {
+  // Render **bold** segments. Everything else is plain text.
+  const parts: React.ReactNode[] = [];
+  const regex = /\*\*(.+?)\*\*/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  let i = 0;
+  while ((m = regex.exec(text)) !== null) {
+    if (m.index > last) parts.push(text.slice(last, m.index));
+    parts.push(<strong key={`${keyPrefix}-b-${i++}`} className="text-foreground font-semibold">{m[1]}</strong>);
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return parts;
+}
+
+function SimpleMarkdown({ text }: { text: string }) {
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  const blocks: React.ReactNode[] = [];
+  let bullets: string[] = [];
+  const flushBullets = () => {
+    if (bullets.length === 0) return;
+    const items = bullets;
+    bullets = [];
+    blocks.push(
+      <ul key={`ul-${blocks.length}`} className="list-disc pl-5 space-y-0.5">
+        {items.map((b, i) => (
+          <li key={i}>{renderInline(b, `li-${blocks.length}-${i}`)}</li>
+        ))}
+      </ul>,
+    );
+  };
+  lines.forEach((raw, idx) => {
+    const line = raw.trim();
+    if (!line) {
+      flushBullets();
+      return;
+    }
+    const bulletMatch = line.match(/^[-*]\s+(.*)$/);
+    if (bulletMatch) {
+      bullets.push(bulletMatch[1]);
+      return;
+    }
+    flushBullets();
+    blocks.push(
+      <p key={`p-${idx}`} className="text-foreground/90">
+        {renderInline(line, `p-${idx}`)}
+      </p>,
+    );
+  });
+  flushBullets();
+  return <>{blocks}</>;
+}
+
