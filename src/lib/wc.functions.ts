@@ -48,7 +48,7 @@ export const getMyPredictions = createServerFn({ method: "GET" })
     const { supabase, userId } = context;
     const { data: preds, error } = await supabase
       .from("predictions")
-      .select("id,match_id,outcome,home_score,away_score,first_scorer_player_id,points")
+      .select("id,match_id,outcome,home_score,away_score,first_scorer_player_id,points,needs_repick")
       .eq("user_id", userId);
     if (error) throw new Error(error.message);
 
@@ -58,6 +58,7 @@ export const getMyPredictions = createServerFn({ method: "GET" })
 
     return { predictions: preds ?? [], scorers: scorers ?? [] };
   });
+
 
 export const getMyTop3 = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -124,7 +125,8 @@ const PredictionInput = z.object({
   home_score: z.number().int().min(0).max(20),
   away_score: z.number().int().min(0).max(20),
   first_scorer_player_id: z.string().uuid().nullable().optional(),
-  scorer_ids: z.array(z.string().uuid()).max(20).default([]),
+  // Rule update: at most ONE other goalscorer allowed per prediction.
+  scorer_ids: z.array(z.string().uuid()).max(1).default([]),
 });
 
 export const upsertPrediction = createServerFn({ method: "POST" })
@@ -132,6 +134,9 @@ export const upsertPrediction = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => PredictionInput.parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+
+    // Defensive clamp in case an older client sends more than one.
+    const scorerIds = data.scorer_ids.slice(0, 1);
 
     const { data: existing } = await supabase
       .from("predictions")
@@ -149,6 +154,7 @@ export const upsertPrediction = createServerFn({ method: "POST" })
           home_score: data.home_score,
           away_score: data.away_score,
           first_scorer_player_id: data.first_scorer_player_id ?? null,
+          needs_repick: false,
         })
         .eq("id", existing.id);
       if (error) throw new Error(error.message);
@@ -170,15 +176,16 @@ export const upsertPrediction = createServerFn({ method: "POST" })
       predictionId = inserted.id;
     }
 
-    // Replace scorers
+    // Replace scorers (max 1)
     await supabase.from("prediction_scorers").delete().eq("prediction_id", predictionId);
-    if (data.scorer_ids.length > 0) {
-      const rows = data.scorer_ids.map((player_id) => ({ prediction_id: predictionId, player_id }));
+    if (scorerIds.length > 0) {
+      const rows = scorerIds.map((player_id) => ({ prediction_id: predictionId, player_id }));
       const { error: sErr } = await supabase.from("prediction_scorers").insert(rows);
       if (sErr) throw new Error(sErr.message);
     }
     return { ok: true };
   });
+
 
 const Top3Input = z.object({
   winner_team_id: z.string().uuid(),
