@@ -25,43 +25,41 @@ async function fetchCached(match_id: string) {
 }
 
 async function firecrawlSearch(query: string): Promise<string> {
-  const lovableKey = process.env.LOVABLE_API_KEY;
   const fcKey = process.env.FIRECRAWL_API_KEY;
-  if (!lovableKey || !fcKey) return "";
-  try {
-    const res = await fetch("https://connector-gateway.lovable.dev/firecrawl/v2/search", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${lovableKey}`,
-        "X-Connection-Api-Key": fcKey,
-      },
-      body: JSON.stringify({
-        query,
-        limit: 5,
-        tbs: "qdr:m", // last month
-      }),
-    });
-    if (!res.ok) {
-      console.warn("[match-preview] firecrawl search failed", res.status, await res.text().catch(() => ""));
-      return "";
-    }
-    const json: any = await res.json();
-    const results = json?.data?.web ?? json?.web ?? json?.data ?? [];
-    const arr = Array.isArray(results) ? results : [];
-    return arr
-      .slice(0, 5)
-      .map((r: any) => {
-        const title = r?.title ?? "";
-        const url = r?.url ?? "";
-        const desc = r?.description ?? r?.snippet ?? "";
-        return `- ${title} (${url})\n  ${desc}`;
-      })
-      .join("\n");
-  } catch (e) {
-    console.warn("[match-preview] firecrawl error", e);
-    return "";
+  if (!fcKey) {
+    throw new Error("FIRECRAWL_API_KEY saknas i servermiljön");
   }
+  console.log("[match-preview] firecrawl query:", query);
+  const res = await fetch("https://api.firecrawl.dev/v2/search", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${fcKey}`,
+    },
+    body: JSON.stringify({
+      query,
+      limit: 5,
+      tbs: "qdr:m",
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    console.error("[match-preview] firecrawl HTTP", res.status, body);
+    throw new Error(`Firecrawl-sökning misslyckades (${res.status}): ${body.slice(0, 200)}`);
+  }
+  const json: any = await res.json();
+  const results = json?.data?.web ?? json?.web ?? json?.data ?? [];
+  const arr = Array.isArray(results) ? results : [];
+  console.log("[match-preview] firecrawl results:", arr.length);
+  return arr
+    .slice(0, 5)
+    .map((r: any) => {
+      const title = r?.title ?? "";
+      const url = r?.url ?? "";
+      const desc = r?.description ?? r?.snippet ?? "";
+      return `- ${title} (${url})\n  ${desc}`;
+    })
+    .join("\n");
 }
 
 async function generateWithGemini(homeName: string, awayName: string, kickoffISO: string, evidence: string): Promise<string> {
