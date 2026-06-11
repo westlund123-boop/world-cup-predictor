@@ -48,7 +48,7 @@ export const getMyPredictions = createServerFn({ method: "GET" })
     const { supabase, userId } = context;
     const { data: preds, error } = await supabase
       .from("predictions")
-      .select("id,match_id,outcome,home_score,away_score,first_scorer_player_id,points")
+      .select("id,match_id,outcome,home_score,away_score,first_scorer_player_id,points,needs_repick")
       .eq("user_id", userId);
     if (error) throw new Error(error.message);
 
@@ -58,6 +58,7 @@ export const getMyPredictions = createServerFn({ method: "GET" })
 
     return { predictions: preds ?? [], scorers: scorers ?? [] };
   });
+
 
 export const getMyTop3 = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
