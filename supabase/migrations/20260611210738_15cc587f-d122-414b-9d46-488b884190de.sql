@@ -1,0 +1,1 @@
+DELETE FROM public.match_previews WHERE content ILIKE '%Inga färska nyheter hittades%' OR content ILIKE '%inga sökresultat%';
