@@ -8,12 +8,14 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useServerFn } from "@tanstack/react-start";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { upsertPrediction } from "@/lib/wc.functions";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { upsertPrediction, getMyProfile } from "@/lib/wc.functions";
+import { getMatchPreview, ensureMatchPreview, regenerateMatchPreview } from "@/lib/match-preview.functions";
 import { matchStatus, STAGE_LABEL, outcomeOf } from "@/lib/scoring";
 import { toast } from "sonner";
-import { Lock, CheckCircle2, Pencil, CircleDashed, Radio, ChevronsUpDown, Check, X, AlertTriangle } from "lucide-react";
+import { Lock, CheckCircle2, Pencil, CircleDashed, Radio, ChevronsUpDown, Check, X, AlertTriangle, Sparkles, ChevronDown, RefreshCw, Loader2 } from "lucide-react";
 import { TeamFlag } from "@/components/TeamFlag";
+import ReactMarkdown from "react-markdown";
 
 type Team = { id: string; name: string; code: string; flag_emoji: string | null; group_letter: string | null };
 type Match = {
