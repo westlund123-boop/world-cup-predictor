@@ -30,9 +30,10 @@ const matchScoring: [string, string][] = [
 
 const goalScoring: [string, string][] = [
   ["Correct first goalscorer", "10 pts"],
-  ["Each other correct goalscorer (player appears in scorers)", "5 pts"],
-  ["Maximum goalscorer points per match", "20 pts"],
+  ["One other correct goalscorer (player appears in scorers)", "5 pts"],
+  ["Maximum goalscorer points per match", "15 pts"],
 ];
+
 
 const knockoutScoring: [string, string][] = [
   ["Picked the correct team to advance — R32, R16 or QF", "10 pts"],
