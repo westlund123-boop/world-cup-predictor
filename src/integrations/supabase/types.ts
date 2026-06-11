@@ -266,6 +266,7 @@ export type Database = {
           home_score: number
           id: string
           match_id: string
+          needs_repick: boolean
           outcome: string
           points: number
           submitted_at: string
@@ -278,6 +279,7 @@ export type Database = {
           home_score: number
           id?: string
           match_id: string
+          needs_repick?: boolean
           outcome: string
           points?: number
           submitted_at?: string
@@ -290,6 +292,7 @@ export type Database = {
           home_score?: number
           id?: string
           match_id?: string
+          needs_repick?: boolean
           outcome?: string
           points?: number
           submitted_at?: string
