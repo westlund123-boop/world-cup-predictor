@@ -138,8 +138,19 @@ async function generateAndStore(match_id: string): Promise<{ content: string; ge
   const home = teams?.find((t) => t.id === match.home_team_id)?.name ?? "Hemmalag";
   const away = teams?.find((t) => t.id === match.away_team_id)?.name ?? "Bortalag";
 
-  const query = `${home} vs ${away} World Cup 2026 form recent results injuries key players`;
-  const evidence = await firecrawlSearch(query);
+  const q1 = `${home} recent results last 5 matches 2025 2026 form W D L`;
+  const q2 = `${away} recent results last 5 matches 2025 2026 form W D L`;
+  const q3 = `${home} vs ${away} World Cup 2026 top scorers qualifying goals`;
+  const [e1, e2, e3] = await Promise.all([
+    firecrawlSearch(q1),
+    firecrawlSearch(q2),
+    firecrawlSearch(q3),
+  ]);
+  const evidence = [
+    `### ${home} – form/resultat\n${e1}`,
+    `### ${away} – form/resultat\n${e2}`,
+    `### Målskyttar / nyckelspelare\n${e3}`,
+  ].join("\n\n");
   const content = await generateWithGemini(home, away, match.kickoff_at, evidence);
 
   const { data: saved, error: sErr } = await supabaseAdmin
