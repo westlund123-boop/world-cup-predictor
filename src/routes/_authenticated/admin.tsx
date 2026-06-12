@@ -674,14 +674,18 @@ function ResultDialog({
 function NumberBox({ value, setValue, label }: { value: number; setValue: (n: number) => void; label: string }) {
   return (
     <div className="flex flex-col items-center">
-      <Input
-        type="number"
-        min={0}
-        max={20}
-        value={value}
-        onChange={(e) => setValue(Math.max(0, Math.min(20, parseInt(e.target.value || "0", 10))))}
-        className="w-16 text-center text-xl font-bold font-mono h-12"
-      />
+      <UISelect value={String(value)} onValueChange={(v) => setValue(parseInt(v, 10))}>
+        <SelectTrigger className="w-20 h-12 text-xl font-bold font-mono justify-center">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent className="min-w-[5rem]">
+          {SCORE_OPTIONS.map((n) => (
+            <SelectItem key={n} value={String(n)} className="justify-center text-base font-mono">
+              {n}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </UISelect>
       <span className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1">{label}</span>
     </div>
   );
