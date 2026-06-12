@@ -284,10 +284,19 @@ function renderFormBlock(teamName: string, f: TeamFormRow | null): string {
     lines.push(`Form: ${f.last10_results} (senaste ${n})${totals}`);
   }
   if (f.top_scorers && f.top_scorers.length > 0) {
-    const s = f.top_scorers
-      .map((x) => `${x.name} (${x.goals} mål)`)
-      .join(", ");
-    lines.push(`Heta skyttar: ${s}`);
+    // Group scorers by timeframe so we never present career and recent
+    // numbers side-by-side without a label.
+    const groups = new Map<string, Array<{ name: string; goals: number }>>();
+    for (const x of f.top_scorers) {
+      const tf = (x.timeframe ?? "senaste 10").trim();
+      const arr = groups.get(tf) ?? [];
+      arr.push({ name: x.name, goals: x.goals });
+      groups.set(tf, arr);
+    }
+    for (const [tf, arr] of groups) {
+      const s = arr.map((x) => `${x.name} (${x.goals} mål)`).join(", ");
+      lines.push(`Heta skyttar (${tf}): ${s}`);
+    }
   }
   return lines.join("\n");
 }
