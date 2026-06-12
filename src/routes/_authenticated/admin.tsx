@@ -616,7 +616,11 @@ function ResultDialog({
             <Label>First goalscorer</Label>
             <select
               value={firstScorer}
-              onChange={(e) => setFirstScorer(e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value;
+                setFirstScorer(v);
+                if (v && !scorers.includes(v)) setScorers([v, ...scorers]);
+              }}
               className="mt-1 w-full h-9 px-3 rounded-md border border-input bg-background text-sm"
             >
               <option value="">— None —</option>
