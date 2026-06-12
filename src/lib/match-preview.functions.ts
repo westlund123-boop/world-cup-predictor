@@ -108,7 +108,7 @@ type TeamFormRow = {
   losses: number | null;
   goals_for: number | null;
   goals_against: number | null;
-  top_scorers: Array<{ name: string; goals: number }> | null;
+  top_scorers: Array<{ name: string; goals: number; timeframe?: string }> | null;
   source: string | null;
   fetched_at: string;
 };
