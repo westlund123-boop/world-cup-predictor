@@ -55,20 +55,33 @@ async function firecrawlScrape(url: string): Promise<string> {
   return md;
 }
 
-async function firecrawlSearchUrl(query: string): Promise<string | null> {
+async function firecrawlSearchUrls(query: string, limit = 5): Promise<string[]> {
   const fcKey = process.env.FIRECRAWL_API_KEY;
-  if (!fcKey) return null;
+  if (!fcKey) return [];
   const res = await fetch("https://api.firecrawl.dev/v2/search", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${fcKey}` },
-    body: JSON.stringify({ query, limit: 3 }),
+    body: JSON.stringify({ query, limit }),
   });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    console.error("[team-form] search HTTP", res.status, "for query:", query);
+    return [];
+  }
   const json: any = await res.json();
   const results = json?.data?.web ?? json?.web ?? json?.data ?? [];
   const arr = Array.isArray(results) ? results : [];
-  const wiki = arr.find((r: any) => typeof r?.url === "string" && r.url.includes("wikipedia.org"));
-  return wiki?.url ?? arr[0]?.url ?? null;
+  return arr.map((r: any) => r?.url).filter((u: any): u is string => typeof u === "string");
+}
+
+async function tryScrape(url: string, attempts: string[]): Promise<string> {
+  try {
+    const md = await firecrawlScrape(url);
+    attempts.push(`OK ${md.length}c ${url}`);
+    return md;
+  } catch (e: any) {
+    attempts.push(`FAIL ${url}: ${e?.message ?? e}`);
+    return "";
+  }
 }
 
 // --- Gemini helpers ---
@@ -118,44 +131,80 @@ function safeInt(v: any): number | null {
   return Math.max(0, Math.floor(v));
 }
 
-async function extractTeamFormFromMarkdown(teamName: string, md: string, sourceUrl: string) {
-  // Truncate very long pages
-  const trimmed = md.length > 60000 ? md.slice(0, 60000) : md;
+function normalizeName(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+async function loadSquadNames(teamId: string): Promise<{ full: Set<string>; lasts: Set<string>; count: number }> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data } = await supabaseAdmin.from("players").select("name").eq("team_id", teamId);
+  const full = new Set<string>();
+  const lasts = new Set<string>();
+  (data ?? []).forEach((p: any) => {
+    const n = normalizeName(p.name ?? "");
+    if (!n) return;
+    full.add(n);
+    const parts = n.split(" ");
+    if (parts.length) lasts.add(parts[parts.length - 1]);
+  });
+  return { full, lasts, count: data?.length ?? 0 };
+}
+
+function isInSquad(name: string, squad: { full: Set<string>; lasts: Set<string> }): boolean {
+  const n = normalizeName(name);
+  if (!n) return false;
+  if (squad.full.has(n)) return true;
+  for (const f of squad.full) {
+    if (f === n) return true;
+    if (f.includes(" " + n) || f.startsWith(n + " ") || f.endsWith(" " + n)) return true;
+    if (n.includes(" " + f) || n.startsWith(f + " ") || n.endsWith(" " + f)) return true;
+  }
+  const parts = n.split(" ");
+  const last = parts[parts.length - 1];
+  if (last && last.length >= 4 && squad.lasts.has(last)) return true;
+  return false;
+}
+
+async function extractTeamFormFromMarkdown(
+  teamName: string,
+  md: string,
+  sourceLabel: string,
+  squad: { full: Set<string>; lasts: Set<string> },
+) {
+  const trimmed = md.length > 90000 ? md.slice(0, 90000) : md;
 
   const system = `You extract structured football national-team form data from Wikipedia markdown. Return ONLY valid JSON matching the requested schema. Use null for any field you cannot verify from the provided text. NEVER invent numbers, results, or player names.`;
 
   const user = `Team: ${teamName}
-Source: ${sourceUrl}
+Sources combined below (may include the team's main Wikipedia page and dedicated "results" sub-pages for 2025/2026).
 
-From the Wikipedia markdown below, extract the team's most recent competitive senior men's national-team matches (qualifiers, Nations League, friendlies, tournaments). Look in "Recent results", "Fixtures and results", "Results and fixtures" or similar sections. Use ONLY matches that have a final score listed.
+Extract the team's most recent UP-TO-10 senior men's competitive matches (World Cup 2026 qualifiers, Nations League, friendlies, Copa/Gold Cup/Asian Cup/Euros/Africa Cup, confederation tournaments). Use ONLY matches that have a final score listed and a date in 2024, 2025, or 2026. Order MOST RECENT FIRST. Look in sections titled "Recent results", "Results and fixtures", "Fixtures and results", "2025", "2026", or in dedicated results sub-pages.
 
 Return JSON with this exact shape:
 {
   "last10_results": string | null,   // W/D/L sequence of up to 10 most recent matches, MOST RECENT FIRST, e.g. "WWDLW" (max 10 chars, only W/D/L)
-  "wins": int | null,                // wins within those matches
+  "wins": int | null,
   "draws": int | null,
   "losses": int | null,
   "goals_for": int | null,           // total goals scored across those matches
   "goals_against": int | null,
-  "top_scorers": [ { "name": string, "goals": int, "timeframe": string } ] | null
+  "top_scorers": [ { "name": string, "goals": int } ] | null
 }
 
-TOP-SCORER RULES (critical):
-- Only count goals scored within a RECENT window. Acceptable windows, in order of preference:
-    1) "senaste 10" — goals tallied from the same ≤10 recent matches above
-    2) "kval 2025-26" — goals in the current World Cup 2026 qualifying campaign
-    3) "landskamper 2025-26" — goals in 2025 + 2026 senior internationals
-- DO NOT use Wikipedia's "all-time top scorers" / "most goals" / career-totals tables. Those numbers (often huge, e.g. 30+) are CAREER totals and must be ignored for the recent window.
-- Each scorer object MUST include "timeframe" set to one of the labels above describing the window the "goals" number covers.
-- If the ONLY verifiable number for a player on this page is their career total (from an all-time list), you MAY include them with timeframe="landslagsmål totalt" — never label a career total as recent form.
-- Up to 3 scorers. Skip any player whose goal count you cannot read from the page.
-- If no scorer numbers can be verified at all, return null.
+HARD RULES — read carefully:
+- last10_results: if you can only verify e.g. 6 matches, return a 6-char sequence and counts that sum to 6. Never pad. Never invent. If you cannot find at least 1 verifiable recent match, set all result fields to null.
+- top_scorers: ONLY count goals scored within the SAME ≤10 recent matches above (the "senaste 10" window). Look through the match scorers/goal-scorers listed for each of those matches and tally them.
+- ABSOLUTELY FORBIDDEN: do NOT use Wikipedia's "all-time top scorers", "most goals", "top scorers" career tables, or any career-totals table. Retired players (Tim Cahill, Hakan Şükür, Landon Donovan, etc.) must NEVER appear. If a name only shows up in an all-time list, IGNORE it.
+- Up to 3 scorers. Skip any player whose recent-window goal tally you cannot verify from individual match results in the provided text.
+- If no scorer goals can be tallied from the recent matches, return top_scorers: null.
 
-Rules for results:
-- If you can only verify e.g. 4 matches, return a 4-char sequence and counts that sum to 4. Never pad.
-- If you cannot find any verifiable recent results at all, return all-null fields.
-
-Wikipedia markdown:
+Markdown:
 ---
 ${trimmed}
 ---`;
@@ -174,32 +223,22 @@ ${trimmed}
     ? parsed.last10_results.toUpperCase().replace(/[^WDL]/g, "").slice(0, 10) || null
     : null;
 
-  const ALLOWED_TF = new Set([
-    "senaste 10",
-    "kval 2025-26",
-    "landskamper 2025-26",
-    "landslagsmål totalt",
-  ]);
-
   let scorers: Array<{ name: string; goals: number; timeframe: string }> | null = null;
   if (Array.isArray(parsed.top_scorers)) {
-    scorers = parsed.top_scorers
-      .filter(
-        (s: any) =>
-          s &&
-          typeof s.name === "string" &&
-          typeof s.goals === "number" &&
-          s.goals > 0 &&
-          typeof s.timeframe === "string" &&
-          ALLOWED_TF.has(s.timeframe.trim()),
-      )
-      .slice(0, 3)
-      .map((s: any) => ({
-        name: s.name.trim(),
-        goals: Math.floor(s.goals),
-        timeframe: s.timeframe.trim(),
-      }));
-    if (scorers!.length === 0) scorers = null;
+    const raw = parsed.top_scorers.filter(
+      (s: any) => s && typeof s.name === "string" && typeof s.goals === "number" && s.goals > 0,
+    );
+    const kept: Array<{ name: string; goals: number; timeframe: string }> = [];
+    for (const s of raw) {
+      const name = s.name.trim();
+      if (!isInSquad(name, squad)) {
+        console.log(`[team-form] dropped non-squad scorer "${name}" for ${teamName}`);
+        continue;
+      }
+      kept.push({ name, goals: Math.floor(s.goals), timeframe: "senaste 10" });
+      if (kept.length >= 3) break;
+    }
+    scorers = kept.length ? kept : null;
   }
 
   return {
@@ -210,7 +249,7 @@ ${trimmed}
     goals_for: safeInt(parsed.goals_for),
     goals_against: safeInt(parsed.goals_against),
     top_scorers: scorers,
-    source: sourceUrl,
+    source: sourceLabel,
   };
 }
 
@@ -232,27 +271,83 @@ async function getTeamForm(teamId: string, teamName: string): Promise<TeamFormRo
     }
   }
 
+  const attempts: string[] = [];
+  const squad = await loadSquadNames(teamId);
+  console.log(`[team-form] starting fetch for ${teamName} (squad size ${squad.count})`);
+
   try {
-    // Try direct Wikipedia URL, fall back to search
     const slug = teamName.replace(/\s+/g, "_");
-    const directUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent(slug)}_national_football_team`;
-    let url = directUrl;
-    let md = "";
-    try {
-      md = await firecrawlScrape(directUrl);
-      // Real national-team pages are huge (>50k chars). Anything smaller
-      // is almost certainly a disambig/redirect stub (e.g. Canada uses
-      // "men's national soccer team" instead of "football team").
-      if (md.length < 20000) throw new Error("page too small / not the team page");
-    } catch (e) {
-      console.log(`[team-form] direct URL too thin for ${teamName}, searching…`);
-      const found = await firecrawlSearchUrl(`${teamName} men's national football soccer team site:en.wikipedia.org`);
-      if (!found) throw new Error("no wikipedia page found");
-      url = found;
-      md = await firecrawlScrape(found);
+    const candidates: string[] = [
+      `https://en.wikipedia.org/wiki/${encodeURIComponent(slug)}_national_football_team`,
+      `https://en.wikipedia.org/wiki/${encodeURIComponent(slug)}_men%27s_national_soccer_team`,
+      `https://en.wikipedia.org/wiki/${encodeURIComponent(slug)}_national_soccer_team`,
+    ];
+
+    // Search for results sub-pages and year pages
+    const searchQueries = [
+      `${teamName} men's national football team results 2025 2026 site:en.wikipedia.org`,
+      `${teamName} national team 2025 results site:en.wikipedia.org`,
+      `${teamName} 2026 FIFA World Cup qualification site:en.wikipedia.org`,
+    ];
+    for (const q of searchQueries) {
+      const urls = await firecrawlSearchUrls(q, 4);
+      for (const u of urls) {
+        if (u.includes("wikipedia.org") && !candidates.includes(u)) candidates.push(u);
+        if (candidates.length >= 8) break;
+      }
+      if (candidates.length >= 8) break;
     }
 
-    const extracted = await extractTeamFormFromMarkdown(teamName, md, url);
+    // Scrape candidates and concatenate the useful ones
+    const parts: string[] = [];
+    let totalChars = 0;
+    for (const url of candidates) {
+      if (totalChars > 120000) break;
+      const md = await tryScrape(url, attempts);
+      if (md.length < 2000) continue; // skip stubs/redirects
+      parts.push(`\n\n===== SOURCE: ${url} =====\n\n${md}`);
+      totalChars += md.length;
+    }
+
+    if (parts.length === 0) {
+      console.error(`[team-form] no usable sources for ${teamName}. Attempts:\n  ${attempts.join("\n  ")}`);
+      return (cached as TeamFormRow) ?? null;
+    }
+
+    const combined = parts.join("\n");
+    const sourceLabel = candidates.slice(0, parts.length).join(" | ");
+
+    let extracted = await extractTeamFormFromMarkdown(teamName, combined, sourceLabel, squad);
+
+    // Fallback if too few matches found
+    if (!extracted.last10_results || extracted.last10_results.length < 5) {
+      console.log(`[team-form] ${teamName} only got ${extracted.last10_results?.length ?? 0} results, trying fallback search`);
+      const fbUrls = await firecrawlSearchUrls(`${teamName} men's national team recent results 2025 2026`, 5);
+      const extra: string[] = [];
+      for (const u of fbUrls.slice(0, 4)) {
+        const md = await tryScrape(u, attempts);
+        if (md.length >= 1000) extra.push(`\n\n===== FALLBACK SOURCE: ${u} =====\n\n${md}`);
+      }
+      if (extra.length) {
+        const combined2 = combined + extra.join("\n");
+        const extracted2 = await extractTeamFormFromMarkdown(teamName, combined2, sourceLabel + " | +fallback", squad);
+        const len1 = extracted.last10_results?.length ?? 0;
+        const len2 = extracted2.last10_results?.length ?? 0;
+        if (len2 > len1) extracted = extracted2;
+      }
+    }
+
+    // Honest omission threshold
+    if (extracted.last10_results && extracted.last10_results.length < 5) {
+      console.log(`[team-form] ${teamName} still only ${extracted.last10_results.length} verified results — omitting form. Attempts:\n  ${attempts.join("\n  ")}`);
+      extracted.last10_results = null;
+      extracted.wins = null;
+      extracted.draws = null;
+      extracted.losses = null;
+      extracted.goals_for = null;
+      extracted.goals_against = null;
+    }
+
     const row = {
       team_id: teamId,
       ...extracted,
@@ -262,11 +357,10 @@ async function getTeamForm(teamId: string, teamName: string): Promise<TeamFormRo
       .from("team_form")
       .upsert(row, { onConflict: "team_id" });
     if (error) console.error("[team-form] upsert error:", error.message);
-    console.log(`[team-form] refreshed ${teamName}:`, extracted.last10_results, `${extracted.goals_for}-${extracted.goals_against}`);
+    console.log(`[team-form] refreshed ${teamName}:`, extracted.last10_results, `${extracted.goals_for}-${extracted.goals_against}`, "scorers:", extracted.top_scorers?.map(s => `${s.name}/${s.goals}`).join(",") ?? "none");
     return row as TeamFormRow;
   } catch (e: any) {
-    console.error(`[team-form] failed for ${teamName}:`, e?.message ?? e);
-    // Return stale cache if available, otherwise null
+    console.error(`[team-form] failed for ${teamName}:`, e?.message ?? e, "\nAttempts:\n  " + attempts.join("\n  "));
     return (cached as TeamFormRow) ?? null;
   }
 }
@@ -284,19 +378,8 @@ function renderFormBlock(teamName: string, f: TeamFormRow | null): string {
     lines.push(`Form: ${f.last10_results} (senaste ${n})${totals}`);
   }
   if (f.top_scorers && f.top_scorers.length > 0) {
-    // Group scorers by timeframe so we never present career and recent
-    // numbers side-by-side without a label.
-    const groups = new Map<string, Array<{ name: string; goals: number }>>();
-    for (const x of f.top_scorers) {
-      const tf = (x.timeframe ?? "senaste 10").trim();
-      const arr = groups.get(tf) ?? [];
-      arr.push({ name: x.name, goals: x.goals });
-      groups.set(tf, arr);
-    }
-    for (const [tf, arr] of groups) {
-      const s = arr.map((x) => `${x.name} (${x.goals} mål)`).join(", ");
-      lines.push(`Heta skyttar (${tf}): ${s}`);
-    }
+    const s = f.top_scorers.map((x) => `${x.name} (${x.goals} mål)`).join(", ");
+    lines.push(`Heta skyttar (senaste 10): ${s}`);
   }
   return lines.join("\n");
 }
