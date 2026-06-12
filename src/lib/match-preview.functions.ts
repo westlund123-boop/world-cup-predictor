@@ -211,10 +211,13 @@ async function getTeamForm(teamId: string, teamName: string): Promise<TeamFormRo
     let md = "";
     try {
       md = await firecrawlScrape(directUrl);
-      if (md.length < 500) throw new Error("page too small");
+      // Real national-team pages are huge (>50k chars). Anything smaller
+      // is almost certainly a disambig/redirect stub (e.g. Canada uses
+      // "men's national soccer team" instead of "football team").
+      if (md.length < 20000) throw new Error("page too small / not the team page");
     } catch (e) {
-      console.log(`[team-form] direct URL failed for ${teamName}, searching…`);
-      const found = await firecrawlSearchUrl(`${teamName} national football team site:en.wikipedia.org`);
+      console.log(`[team-form] direct URL too thin for ${teamName}, searching…`);
+      const found = await firecrawlSearchUrl(`${teamName} men's national football soccer team site:en.wikipedia.org`);
       if (!found) throw new Error("no wikipedia page found");
       url = found;
       md = await firecrawlScrape(found);
