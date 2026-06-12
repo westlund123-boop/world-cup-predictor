@@ -366,6 +366,53 @@ export type Database = {
         }
         Relationships: []
       }
+      team_form: {
+        Row: {
+          draws: number | null
+          fetched_at: string
+          goals_against: number | null
+          goals_for: number | null
+          last10_results: string | null
+          losses: number | null
+          source: string | null
+          team_id: string
+          top_scorers: Json | null
+          wins: number | null
+        }
+        Insert: {
+          draws?: number | null
+          fetched_at?: string
+          goals_against?: number | null
+          goals_for?: number | null
+          last10_results?: string | null
+          losses?: number | null
+          source?: string | null
+          team_id: string
+          top_scorers?: Json | null
+          wins?: number | null
+        }
+        Update: {
+          draws?: number | null
+          fetched_at?: string
+          goals_against?: number | null
+          goals_for?: number | null
+          last10_results?: string | null
+          losses?: number | null
+          source?: string | null
+          team_id?: string
+          top_scorers?: Json | null
+          wins?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_form_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: true
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       teams: {
         Row: {
           code: string
