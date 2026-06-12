@@ -34,6 +34,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select as UISelect, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+
+const SCORE_OPTIONS = Array.from({ length: 11 }, (_, i) => i); // 0..10
 import { toast } from "sonner";
 import { STAGE_LABEL, matchStatus } from "@/lib/scoring";
 import { Calculator, Download, Pencil, Trophy, CircleAlert, CircleCheck, CircleDashed } from "lucide-react";
