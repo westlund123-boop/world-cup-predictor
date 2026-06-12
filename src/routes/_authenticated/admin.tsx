@@ -34,6 +34,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select as UISelect, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+
+const SCORE_OPTIONS = Array.from({ length: 11 }, (_, i) => i); // 0..10
 import { toast } from "sonner";
 import { STAGE_LABEL, matchStatus } from "@/lib/scoring";
 import { Calculator, Download, Pencil, Trophy, CircleAlert, CircleCheck, CircleDashed } from "lucide-react";
@@ -510,7 +513,7 @@ function ResultDialog({
   const fn = useServerFn(adminSaveResult);
   const save = useMutation({
     mutationFn: () => {
-      // Ensure first scorer is included in scorers list (client-side mirror of server rule)
+      // Always include the first scorer in the goalscorers list (server enforces this).
       const allScorers =
         firstScorer && !scorers.includes(firstScorer) ? [firstScorer, ...scorers] : scorers;
       return fn({
@@ -521,7 +524,7 @@ function ResultDialog({
           status,
           winner_team_id: winner || null,
           first_scorer_player_id: firstScorer || null,
-          scorer_player_ids: allScorers.filter((x) => x !== firstScorer),
+          scorer_player_ids: allScorers,
         },
       });
     },
@@ -613,7 +616,11 @@ function ResultDialog({
             <Label>First goalscorer</Label>
             <select
               value={firstScorer}
-              onChange={(e) => setFirstScorer(e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value;
+                setFirstScorer(v);
+                if (v && !scorers.includes(v)) setScorers([v, ...scorers]);
+              }}
               className="mt-1 w-full h-9 px-3 rounded-md border border-input bg-background text-sm"
             >
               <option value="">— None —</option>
@@ -667,14 +674,18 @@ function ResultDialog({
 function NumberBox({ value, setValue, label }: { value: number; setValue: (n: number) => void; label: string }) {
   return (
     <div className="flex flex-col items-center">
-      <Input
-        type="number"
-        min={0}
-        max={20}
-        value={value}
-        onChange={(e) => setValue(Math.max(0, Math.min(20, parseInt(e.target.value || "0", 10))))}
-        className="w-16 text-center text-xl font-bold font-mono h-12"
-      />
+      <UISelect value={String(value)} onValueChange={(v) => setValue(parseInt(v, 10))}>
+        <SelectTrigger className="w-20 h-12 text-xl font-bold font-mono justify-center">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent className="min-w-[5rem]">
+          {SCORE_OPTIONS.map((n) => (
+            <SelectItem key={n} value={String(n)} className="justify-center text-base font-mono">
+              {n}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </UISelect>
       <span className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1">{label}</span>
     </div>
   );
