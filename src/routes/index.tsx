@@ -26,21 +26,11 @@ function Landing() {
 
   useEffect(() => {
     let active = true;
-    const redirectToDashboard = () => {
-      window.setTimeout(() => {
-        if (active) navigate({ to: "/dashboard", replace: true });
-      }, 0);
-    };
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "INITIAL_SESSION") return;
-      if (session) redirectToDashboard();
-    });
     supabase.auth.getUser().then(({ data }) => {
-      if (data.user) redirectToDashboard();
+      if (active && data.user) navigate({ to: "/dashboard", replace: true });
     });
     return () => {
       active = false;
-      subscription.unsubscribe();
     };
   }, [navigate]);
 
@@ -50,7 +40,10 @@ function Landing() {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
     if (error) toast.error(error.message);
-    else toast.success("Signed in");
+    else {
+      toast.success("Signed in");
+      navigate({ to: "/dashboard", replace: true });
+    }
   };
 
   return (
