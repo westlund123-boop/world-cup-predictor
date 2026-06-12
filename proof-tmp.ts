@@ -101,7 +101,7 @@ async function getTeamForm(teamId: string, name: string) {
     const slug = name.replace(/\s+/g, "_");
     const direct = `https://en.wikipedia.org/wiki/${encodeURIComponent(slug)}_national_football_team`;
     let url = direct, md = "";
-    try { md = await fcScrape(direct); if (md.length < 500) throw new Error("small"); }
+    try { md = await fcScrape(direct); if (md.length < 20000) throw new Error("small"); }
     catch { const f = await fcSearchUrl(`${name} national football team site:en.wikipedia.org`); if (!f) throw new Error("no wiki"); url = f; md = await fcScrape(f); }
     const ex = await extract(name, md, url);
     const row = { team_id: teamId, ...ex, fetched_at: new Date().toISOString() };
