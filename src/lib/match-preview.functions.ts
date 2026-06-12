@@ -132,7 +132,17 @@ function safeInt(v: any): number | null {
 }
 
 function normalizeName(s: string): string {
-  return s
+  // Map common non-ASCII letters that don't decompose via NFD (Turkish ı/İ, Nordic ø/æ, etc.)
+  const mapped = s
+    .replace(/[ıİ]/g, "i")
+    .replace(/[øØ]/g, "o")
+    .replace(/[æÆ]/g, "ae")
+    .replace(/[œŒ]/g, "oe")
+    .replace(/[ß]/g, "ss")
+    .replace(/[ðÐ]/g, "d")
+    .replace(/[þÞ]/g, "th")
+    .replace(/[łŁ]/g, "l");
+  return mapped
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
     .toLowerCase()
@@ -171,13 +181,37 @@ function isInSquad(name: string, squad: { full: Set<string>; lasts: Set<string> 
   return false;
 }
 
+function sliceToResultsSection(md: string, maxLen = 90000): string {
+  if (md.length <= maxLen) return md;
+  // Find the most useful anchor and slice around it
+  const anchors = [
+    "## Results", "Results and fixtures", "Recent results",
+    "Fixtures and results", "## Fixtures",
+  ];
+  let bestIdx = -1;
+  for (const a of anchors) {
+    const i = md.indexOf(a);
+    if (i > -1 && (bestIdx === -1 || i < bestIdx)) bestIdx = i;
+  }
+  if (bestIdx === -1) {
+    // Fallback: find the LAST occurrence of "2025" or "2026" and slice around it
+    const i2026 = md.lastIndexOf("2026");
+    const i2025 = md.lastIndexOf("2025");
+    bestIdx = Math.max(i2026, i2025);
+  }
+  if (bestIdx === -1) return md.slice(0, maxLen);
+  const start = Math.max(0, bestIdx - 5000);
+  return md.slice(start, start + maxLen);
+}
+
 async function extractTeamFormFromMarkdown(
   teamName: string,
   md: string,
   sourceLabel: string,
   squad: { full: Set<string>; lasts: Set<string> },
 ) {
-  const trimmed = md.length > 90000 ? md.slice(0, 90000) : md;
+  const trimmed = sliceToResultsSection(md, 90000);
+
 
   const system = `You extract structured football national-team form data from Wikipedia markdown. Return ONLY valid JSON matching the requested schema. Use null for any field you cannot verify from the provided text. NEVER invent numbers, results, or player names.`;
 
