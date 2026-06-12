@@ -513,7 +513,7 @@ function ResultDialog({
   const fn = useServerFn(adminSaveResult);
   const save = useMutation({
     mutationFn: () => {
-      // Ensure first scorer is included in scorers list (client-side mirror of server rule)
+      // Always include the first scorer in the goalscorers list (server enforces this).
       const allScorers =
         firstScorer && !scorers.includes(firstScorer) ? [firstScorer, ...scorers] : scorers;
       return fn({
@@ -524,7 +524,7 @@ function ResultDialog({
           status,
           winner_team_id: winner || null,
           first_scorer_player_id: firstScorer || null,
-          scorer_player_ids: allScorers.filter((x) => x !== firstScorer),
+          scorer_player_ids: allScorers,
         },
       });
     },
