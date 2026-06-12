@@ -137,13 +137,23 @@ Return JSON with this exact shape:
   "losses": int | null,
   "goals_for": int | null,           // total goals scored across those matches
   "goals_against": int | null,
-  "top_scorers": [ { "name": string, "goals": int } ] | null  // up to 3 most prolific recent scorers if a "Top scorers" / "Goalscorers" table is present, else null
+  "top_scorers": [ { "name": string, "goals": int, "timeframe": string } ] | null
 }
 
-Rules:
+TOP-SCORER RULES (critical):
+- Only count goals scored within a RECENT window. Acceptable windows, in order of preference:
+    1) "senaste 10" — goals tallied from the same ≤10 recent matches above
+    2) "kval 2025-26" — goals in the current World Cup 2026 qualifying campaign
+    3) "landskamper 2025-26" — goals in 2025 + 2026 senior internationals
+- DO NOT use Wikipedia's "all-time top scorers" / "most goals" / career-totals tables. Those numbers (often huge, e.g. 30+) are CAREER totals and must be ignored for the recent window.
+- Each scorer object MUST include "timeframe" set to one of the labels above describing the window the "goals" number covers.
+- If the ONLY verifiable number for a player on this page is their career total (from an all-time list), you MAY include them with timeframe="landslagsmål totalt" — never label a career total as recent form.
+- Up to 3 scorers. Skip any player whose goal count you cannot read from the page.
+- If no scorer numbers can be verified at all, return null.
+
+Rules for results:
 - If you can only verify e.g. 4 matches, return a 4-char sequence and counts that sum to 4. Never pad.
 - If you cannot find any verifiable recent results at all, return all-null fields.
-- Do NOT include players whose goal counts you cannot read from the page.
 
 Wikipedia markdown:
 ---
@@ -155,7 +165,6 @@ ${trimmed}
   try {
     parsed = JSON.parse(text);
   } catch {
-    // sometimes wrapped in ```json
     const m = text.match(/\{[\s\S]*\}/);
     if (!m) throw new Error("Could not parse JSON from AI response");
     parsed = JSON.parse(m[0]);
@@ -165,12 +174,31 @@ ${trimmed}
     ? parsed.last10_results.toUpperCase().replace(/[^WDL]/g, "").slice(0, 10) || null
     : null;
 
-  let scorers: Array<{ name: string; goals: number }> | null = null;
+  const ALLOWED_TF = new Set([
+    "senaste 10",
+    "kval 2025-26",
+    "landskamper 2025-26",
+    "landslagsmål totalt",
+  ]);
+
+  let scorers: Array<{ name: string; goals: number; timeframe: string }> | null = null;
   if (Array.isArray(parsed.top_scorers)) {
     scorers = parsed.top_scorers
-      .filter((s: any) => s && typeof s.name === "string" && typeof s.goals === "number" && s.goals > 0)
+      .filter(
+        (s: any) =>
+          s &&
+          typeof s.name === "string" &&
+          typeof s.goals === "number" &&
+          s.goals > 0 &&
+          typeof s.timeframe === "string" &&
+          ALLOWED_TF.has(s.timeframe.trim()),
+      )
       .slice(0, 3)
-      .map((s: any) => ({ name: s.name.trim(), goals: Math.floor(s.goals) }));
+      .map((s: any) => ({
+        name: s.name.trim(),
+        goals: Math.floor(s.goals),
+        timeframe: s.timeframe.trim(),
+      }));
     if (scorers!.length === 0) scorers = null;
   }
 
@@ -185,6 +213,7 @@ ${trimmed}
     source: sourceUrl,
   };
 }
+
 
 async function getTeamForm(teamId: string, teamName: string): Promise<TeamFormRow | null> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
