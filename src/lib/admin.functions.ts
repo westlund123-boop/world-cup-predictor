@@ -87,7 +87,8 @@ const ResultInput = z.object({
   // Required for tied KO matches (penalty winner); optional otherwise.
   winner_team_id: z.string().uuid().nullable().optional(),
   first_scorer_player_id: z.string().uuid().nullable().optional(),
-  scorer_player_ids: z.array(z.string().uuid()).max(40).default([]),
+  // Multiset: a player who scored N times appears N times in this array.
+  scorer_player_ids: z.array(z.string().uuid()).max(60).default([]),
 });
 
 const KO_STAGES = new Set(["r32", "r16", "qf", "sf", "third", "final"]);
