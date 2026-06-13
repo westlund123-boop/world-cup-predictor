@@ -29,15 +29,26 @@ export const getMatches = createServerFn({ method: "GET" }).handler(async () => 
 
 export const getPlayers = createServerFn({ method: "GET" }).handler(async () => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data, error } = await supabaseAdmin
-    .from("players")
-    .select("id,team_id,name,name_on_shirt,position,shirt_number,club,active")
-    .eq("active", true)
-    .order("shirt_number", { ascending: true, nullsFirst: false })
-    .order("name")
-    .limit(5000);
-  if (error) throw new Error(error.message);
-  return data ?? [];
+  // Paginate to bypass PostgREST's per-request row cap (default 1000),
+  // which previously truncated the active-squads list and made some scorers
+  // missing from the admin Result dialog.
+  const PAGE = 1000;
+  const all: any[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabaseAdmin
+      .from("players")
+      .select("id,team_id,name,name_on_shirt,position,shirt_number,club,active")
+      .eq("active", true)
+      .order("team_id")
+      .order("shirt_number", { ascending: true, nullsFirst: false })
+      .order("name")
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(error.message);
+    if (!data || data.length === 0) break;
+    all.push(...data);
+    if (data.length < PAGE) break;
+  }
+  return all;
 });
 
 // ---------- Authenticated reads ----------
