@@ -289,6 +289,7 @@ function MatchPreviewSection({ matchId, homeName, awayName, locked, myOutcome }:
 
       {open && (
         <div className="px-3 pb-3 pt-1 space-y-2 border-t border-border">
+          <ProbabilityLines matchId={matchId} homeName={homeName} awayName={awayName} locked={locked} myOutcome={myOutcome} />
           {loading && !preview && (
             <div className="flex items-center gap-2 py-3 text-xs text-muted-foreground">
               <Loader2 className="h-3.5 w-3.5 animate-spin" /> Hämtar färsk info om {homeName} och {awayName}…
