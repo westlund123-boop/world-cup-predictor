@@ -106,6 +106,41 @@ export type Database = {
           },
         ]
       }
+      match_odds: {
+        Row: {
+          away_pct: number | null
+          draw_pct: number | null
+          fetched_at: string
+          home_pct: number | null
+          match_id: string
+          source: string | null
+        }
+        Insert: {
+          away_pct?: number | null
+          draw_pct?: number | null
+          fetched_at?: string
+          home_pct?: number | null
+          match_id: string
+          source?: string | null
+        }
+        Update: {
+          away_pct?: number | null
+          draw_pct?: number | null
+          fetched_at?: string
+          home_pct?: number | null
+          match_id?: string
+          source?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_odds_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: true
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       match_previews: {
         Row: {
           content: string
@@ -593,6 +628,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_match_consensus: {
+        Args: { match_uuid: string }
+        Returns: {
+          away_pct: number
+          draw_pct: number
+          home_pct: number
+          locked: boolean
+          total: number
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
