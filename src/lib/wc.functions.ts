@@ -332,7 +332,6 @@ export const getTopScorerStandings = createServerFn({ method: "GET" }).handler(a
   }
   if (sErr) throw new Error(sErr.message);
   if (mErr) throw new Error(mErr.message);
-  if (pErr) throw new Error(pErr.message);
 
   const finishedMatchIds = new Set((matches ?? []).filter((m) => m.status === "finished").map((m) => m.id));
   const counts = new Map<string, number>();
