@@ -135,7 +135,10 @@ export const adminSaveResult = createServerFn({ method: "POST" })
       // Group draw → winner_team_id stays null
     }
 
-    // Dedupe and validate scorer squad membership
+    // Validate squad membership using the UNIQUE set of scorer ids
+    // (the array itself is a multiset — duplicates encode multiple goals
+    // by the same player). The first scorer, if set, must appear at least
+    // once in the array.
     const uniqueScorerIds = Array.from(new Set(data.scorer_player_ids));
     if (
       data.first_scorer_player_id &&
@@ -169,7 +172,8 @@ export const adminSaveResult = createServerFn({ method: "POST" })
       .eq("id", data.match_id);
     if (uErr) throw new Error(uErr.message);
 
-    // Replace goalscorer rows
+    // Replace goalscorer rows. Insert ONE row per goal (so a player who
+    // scored twice gets two rows) — the top-scorer standings sum these.
     const { error: dErr } = await supabaseAdmin
       .from("match_goalscorers")
       .delete()
@@ -178,17 +182,33 @@ export const adminSaveResult = createServerFn({ method: "POST" })
 
     const rows: { match_id: string; player_id: string; is_first: boolean; ord: number }[] = [];
     let ord = 0;
+    let firstUsed = false;
+    // Order: first scorer's first goal first (is_first=true), then the rest preserving input order.
+    const remaining = [...data.scorer_player_ids];
     if (data.first_scorer_player_id) {
-      rows.push({
+      const idx = remaining.indexOf(data.first_scorer_player_id);
+      if (idx >= 0) {
+        remaining.splice(idx, 1);
+        rows.push({
+          match_id: data.match_id,
+          player_id: data.first_scorer_player_id,
+          is_first: true,
+          ord: ord++,
+        });
+        firstUsed = true;
+      }
+    }
+    for (const pid of remaining) {
+      rows.push({ match_id: data.match_id, player_id: pid, is_first: false, ord: ord++ });
+    }
+    if (!firstUsed && data.first_scorer_player_id) {
+      // First scorer was set but absent from list — defensive, shouldn't happen due to earlier check.
+      rows.unshift({
         match_id: data.match_id,
         player_id: data.first_scorer_player_id,
         is_first: true,
-        ord: ord++,
+        ord: 0,
       });
-    }
-    for (const pid of uniqueScorerIds) {
-      if (pid === data.first_scorer_player_id) continue;
-      rows.push({ match_id: data.match_id, player_id: pid, is_first: false, ord: ord++ });
     }
     if (rows.length > 0) {
       const { error: gErr } = await supabaseAdmin.from("match_goalscorers").insert(rows);
