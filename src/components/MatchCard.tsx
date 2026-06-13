@@ -237,7 +237,7 @@ export function MatchCard({
   );
 }
 
-function MatchPreviewSection({ matchId, homeName, awayName }: { matchId: string; homeName: string; awayName: string }) {
+function MatchPreviewSection({ matchId, homeName, awayName, locked, myOutcome }: { matchId: string; homeName: string; awayName: string; locked: boolean; myOutcome: "1" | "X" | "2" | null }) {
   const [open, setOpen] = useState(false);
   const qc = useQueryClient();
   const getFn = useServerFn(getMatchPreview);
