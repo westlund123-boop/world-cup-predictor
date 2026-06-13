@@ -566,14 +566,21 @@ export const adminGetAllPlayers = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data, error } = await supabaseAdmin
-      .from("players")
-      .select("id,team_id,name,name_on_shirt,position,shirt_number,club,active")
-      .order("team_id")
-      .order("shirt_number", { ascending: true, nullsFirst: false })
-      .limit(5000);
-    if (error) throw new Error(error.message);
-    return data ?? [];
+    // Paginate to bypass PostgREST row cap (default 1000) — squads admin must show every player.
+    const all: any[] = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await supabaseAdmin
+        .from("players")
+        .select("id,team_id,name,name_on_shirt,position,shirt_number,club,active")
+        .order("team_id")
+        .order("shirt_number", { ascending: true, nullsFirst: false })
+        .range(from, from + 999);
+      if (error) throw new Error(error.message);
+      if (!data || data.length === 0) break;
+      all.push(...data);
+      if (data.length < 1000) break;
+    }
+    return all;
   });
 
 const PlayerUpsertInput = z.object({
