@@ -484,7 +484,14 @@ function ResultDialog({
   const [as_, setAs] = useState<number>(match.away_score ?? 0);
   const [status, setStatus] = useState<"scheduled" | "live" | "finished">(match.status);
   const [firstScorer, setFirstScorer] = useState<string>(existing?.first ?? "");
-  const [scorers, setScorers] = useState<string[]>(existing?.all ?? []);
+  // counts[player_id] = number of goals by that player in this match.
+  // Initialize from existing rows (duplicates encode multiple goals).
+  const initialCounts = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const pid of existing?.all ?? []) m[pid] = (m[pid] ?? 0) + 1;
+    return m;
+  }, [existing]);
+  const [counts, setCounts] = useState<Record<string, number>>(initialCounts);
   const [winner, setWinner] = useState<string>(match.winner_team_id ?? "");
 
   if (!home || !away) {
@@ -510,12 +517,20 @@ function ResultDialog({
   const isKO = match.stage !== "group";
   const isTied = hs === as_;
   const needsWinner = status === "finished" && isKO && isTied;
+  const totalGoalsEntered = Object.values(counts).reduce((s, n) => s + n, 0);
+  const totalGoalsExpected = hs + as_;
   const fn = useServerFn(adminSaveResult);
   const save = useMutation({
     mutationFn: () => {
-      // Always include the first scorer in the goalscorers list (server enforces this).
-      const allScorers =
-        firstScorer && !scorers.includes(firstScorer) ? [firstScorer, ...scorers] : scorers;
+      // Expand counts into a multiset array: [pid, pid, ...] one entry per goal.
+      let multiset: string[] = [];
+      for (const [pid, n] of Object.entries(counts)) {
+        for (let i = 0; i < n; i++) multiset.push(pid);
+      }
+      // Ensure first scorer is present at least once.
+      if (firstScorer && !multiset.includes(firstScorer)) {
+        multiset = [firstScorer, ...multiset];
+      }
       return fn({
         data: {
           match_id: match.id,
@@ -524,7 +539,7 @@ function ResultDialog({
           status,
           winner_team_id: winner || null,
           first_scorer_player_id: firstScorer || null,
-          scorer_player_ids: allScorers,
+          scorer_player_ids: multiset,
         },
       });
     },
@@ -535,6 +550,16 @@ function ResultDialog({
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  function bump(pid: string, delta: number) {
+    setCounts((prev) => {
+      const next = { ...prev };
+      const v = Math.max(0, Math.min(10, (next[pid] ?? 0) + delta));
+      if (v === 0) delete next[pid];
+      else next[pid] = v;
+      return next;
+    });
+  }
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
