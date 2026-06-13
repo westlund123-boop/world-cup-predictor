@@ -644,7 +644,7 @@ function ResultDialog({
               onChange={(e) => {
                 const v = e.target.value;
                 setFirstScorer(v);
-                if (v && !scorers.includes(v)) setScorers([v, ...scorers]);
+                if (v && !counts[v]) setCounts((prev) => ({ ...prev, [v]: 1 }));
               }}
               className="mt-1 w-full h-9 px-3 rounded-md border border-input bg-background text-sm"
             >
@@ -659,35 +659,62 @@ function ResultDialog({
           </div>
 
           <div>
-            <Label>All goalscorers</Label>
-            <div className="grid grid-cols-2 gap-3 mt-1 max-h-40 overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <Label>Goalscorers (goals per player)</Label>
+              <span
+                className={`text-[10px] tabular-nums ${
+                  status === "finished" && totalGoalsEntered !== totalGoalsExpected
+                    ? "text-destructive font-semibold"
+                    : "text-muted-foreground"
+                }`}
+              >
+                {totalGoalsEntered} / {totalGoalsExpected} goals
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-3 mt-1 max-h-56 overflow-y-auto">
               {[{ team: home, list: homeSquad }, { team: away, list: awaySquad }].map(({ team, list }) => (
                 <div key={team.id}>
                   <div className="text-xs font-semibold mb-1">{team.name}</div>
                   {list.map((p: any) => {
-                    const checked = scorers.includes(p.id);
+                    const n = counts[p.id] ?? 0;
                     return (
-                      <label key={p.id} className="flex items-center gap-2 text-xs py-0.5">
-                        <Checkbox
-                          checked={checked}
-                          onCheckedChange={(v) => {
-                            if (v) setScorers([...scorers, p.id]);
-                            else setScorers(scorers.filter((x) => x !== p.id));
-                          }}
-                        />
-                        {p.name}
-                      </label>
+                      <div key={p.id} className="flex items-center gap-1.5 text-xs py-0.5">
+                        <button
+                          type="button"
+                          onClick={() => bump(p.id, -1)}
+                          disabled={n === 0}
+                          className="h-5 w-5 rounded border border-input text-xs leading-none disabled:opacity-30"
+                          aria-label={`Decrease goals for ${p.name}`}
+                        >
+                          −
+                        </button>
+                        <span className={`w-4 text-center tabular-nums ${n > 0 ? "font-semibold text-primary" : "text-muted-foreground"}`}>
+                          {n}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => bump(p.id, +1)}
+                          className="h-5 w-5 rounded border border-input text-xs leading-none"
+                          aria-label={`Increase goals for ${p.name}`}
+                        >
+                          +
+                        </button>
+                        <span className="truncate">{p.name}</span>
+                      </div>
                     );
                   })}
                 </div>
               ))}
             </div>
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              Bump the counter to record multiple goals for the same player — the top-scorer
+              standings sum these counts.
+            </p>
           </div>
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
           <Button onClick={() => save.mutate()} disabled={save.isPending || (needsWinner && !winner)}>
-
             {save.isPending ? "Saving…" : "Save result"}
           </Button>
         </DialogFooter>
