@@ -545,3 +545,58 @@ function SimpleMarkdown({ text }: { text: string }) {
   return <>{blocks}</>;
 }
 
+
+function ProbabilityLines({ matchId, homeName, awayName, locked, myOutcome }: { matchId: string; homeName: string; awayName: string; locked: boolean; myOutcome: "1" | "X" | "2" | null }) {
+  const oddsFn = useServerFn(getMatchOdds);
+  const consFn = useServerFn(getMatchConsensus);
+
+  const oddsQ = useQuery({
+    queryKey: ["matchOdds", matchId],
+    queryFn: () => oddsFn({ data: { match_id: matchId } }),
+    staleTime: 60 * 60 * 1000,
+  });
+  const consQ = useQuery({
+    queryKey: ["matchConsensus", matchId, locked],
+    queryFn: () => consFn({ data: { match_id: matchId } }),
+    staleTime: 30 * 1000,
+    enabled: locked,
+  });
+
+  const odds = oddsQ.data;
+  const cons = consQ.data;
+
+  const fmt = (n: number | null | undefined) => (n == null ? "–" : `${n}%`);
+  const bold = (active: boolean, txt: string) => (active ? <strong>{txt}</strong> : <>{txt}</>);
+
+  return (
+    <div className="space-y-1 text-xs rounded-md bg-muted/30 px-2 py-2 border border-border/60">
+      {odds && (
+        <div className="flex flex-wrap gap-x-2">
+          <span className="text-muted-foreground">Marknaden:</span>
+          <span>{homeName} {fmt(odds.home_pct)}</span>
+          <span className="text-muted-foreground">·</span>
+          <span>Oavgjort {fmt(odds.draw_pct)}</span>
+          <span className="text-muted-foreground">·</span>
+          <span>{awayName} {fmt(odds.away_pct)}</span>
+        </div>
+      )}
+      {locked ? (
+        cons && cons.locked && cons.total > 0 ? (
+          <div className="flex flex-wrap gap-x-2">
+            <span className="text-muted-foreground">Kontoret:</span>
+            <span>{bold(myOutcome === "1", `${homeName} ${fmt(cons.home_pct)}`)}</span>
+            <span className="text-muted-foreground">·</span>
+            <span>{bold(myOutcome === "X", `Oavgjort ${fmt(cons.draw_pct)}`)}</span>
+            <span className="text-muted-foreground">·</span>
+            <span>{bold(myOutcome === "2", `${awayName} ${fmt(cons.away_pct)}`)}</span>
+            <span className="text-muted-foreground">({cons.total} tips)</span>
+          </div>
+        ) : (
+          <div className="text-muted-foreground italic">Kontoret: inga tips inlagda</div>
+        )
+      ) : (
+        <div className="text-muted-foreground italic">Kontorets tips avslöjas vid avspark</div>
+      )}
+    </div>
+  );
+}
