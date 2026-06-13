@@ -6,7 +6,7 @@ import { getMatches, getTeams, getPlayers, getMyPredictions } from "@/lib/wc.fun
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { MatchCard } from "@/components/MatchCard";
 import { Card } from "@/components/ui/card";
-import { matchStatus } from "@/lib/scoring";
+
 
 export const Route = createFileRoute("/_authenticated/matches")({
   head: () => ({ meta: [{ title: "Matches — WC 2026 Predictor" }] }),
