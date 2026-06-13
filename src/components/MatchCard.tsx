@@ -11,6 +11,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { upsertPrediction, getMyProfile } from "@/lib/wc.functions";
 import { getMatchPreview, ensureMatchPreview, regenerateMatchPreview } from "@/lib/match-preview.functions";
+import { getMatchOdds, getMatchConsensus } from "@/lib/match-odds.functions";
 import { matchStatus, STAGE_LABEL, outcomeOf } from "@/lib/scoring";
 import { toast } from "sonner";
 import { Lock, CheckCircle2, Pencil, CircleDashed, Radio, ChevronsUpDown, Check, X, AlertTriangle, Sparkles, ChevronDown, RefreshCw, Loader2 } from "lucide-react";
