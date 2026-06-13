@@ -33,7 +33,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Checkbox } from "@/components/ui/checkbox";
+
 import { Select as UISelect, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 
 const SCORE_OPTIONS = Array.from({ length: 11 }, (_, i) => i); // 0..10
@@ -484,7 +484,14 @@ function ResultDialog({
   const [as_, setAs] = useState<number>(match.away_score ?? 0);
   const [status, setStatus] = useState<"scheduled" | "live" | "finished">(match.status);
   const [firstScorer, setFirstScorer] = useState<string>(existing?.first ?? "");
-  const [scorers, setScorers] = useState<string[]>(existing?.all ?? []);
+  // counts[player_id] = number of goals by that player in this match.
+  // Initialize from existing rows (duplicates encode multiple goals).
+  const initialCounts = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const pid of existing?.all ?? []) m[pid] = (m[pid] ?? 0) + 1;
+    return m;
+  }, [existing]);
+  const [counts, setCounts] = useState<Record<string, number>>(initialCounts);
   const [winner, setWinner] = useState<string>(match.winner_team_id ?? "");
 
   if (!home || !away) {
@@ -510,12 +517,20 @@ function ResultDialog({
   const isKO = match.stage !== "group";
   const isTied = hs === as_;
   const needsWinner = status === "finished" && isKO && isTied;
+  const totalGoalsEntered = Object.values(counts).reduce((s, n) => s + n, 0);
+  const totalGoalsExpected = hs + as_;
   const fn = useServerFn(adminSaveResult);
   const save = useMutation({
     mutationFn: () => {
-      // Always include the first scorer in the goalscorers list (server enforces this).
-      const allScorers =
-        firstScorer && !scorers.includes(firstScorer) ? [firstScorer, ...scorers] : scorers;
+      // Expand counts into a multiset array: [pid, pid, ...] one entry per goal.
+      let multiset: string[] = [];
+      for (const [pid, n] of Object.entries(counts)) {
+        for (let i = 0; i < n; i++) multiset.push(pid);
+      }
+      // Ensure first scorer is present at least once.
+      if (firstScorer && !multiset.includes(firstScorer)) {
+        multiset = [firstScorer, ...multiset];
+      }
       return fn({
         data: {
           match_id: match.id,
@@ -524,7 +539,7 @@ function ResultDialog({
           status,
           winner_team_id: winner || null,
           first_scorer_player_id: firstScorer || null,
-          scorer_player_ids: allScorers,
+          scorer_player_ids: multiset,
         },
       });
     },
@@ -535,6 +550,16 @@ function ResultDialog({
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  function bump(pid: string, delta: number) {
+    setCounts((prev) => {
+      const next = { ...prev };
+      const v = Math.max(0, Math.min(10, (next[pid] ?? 0) + delta));
+      if (v === 0) delete next[pid];
+      else next[pid] = v;
+      return next;
+    });
+  }
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
@@ -619,7 +644,7 @@ function ResultDialog({
               onChange={(e) => {
                 const v = e.target.value;
                 setFirstScorer(v);
-                if (v && !scorers.includes(v)) setScorers([v, ...scorers]);
+                if (v && !counts[v]) setCounts((prev) => ({ ...prev, [v]: 1 }));
               }}
               className="mt-1 w-full h-9 px-3 rounded-md border border-input bg-background text-sm"
             >
@@ -634,35 +659,62 @@ function ResultDialog({
           </div>
 
           <div>
-            <Label>All goalscorers</Label>
-            <div className="grid grid-cols-2 gap-3 mt-1 max-h-40 overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <Label>Goalscorers (goals per player)</Label>
+              <span
+                className={`text-[10px] tabular-nums ${
+                  status === "finished" && totalGoalsEntered !== totalGoalsExpected
+                    ? "text-destructive font-semibold"
+                    : "text-muted-foreground"
+                }`}
+              >
+                {totalGoalsEntered} / {totalGoalsExpected} goals
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-3 mt-1 max-h-56 overflow-y-auto">
               {[{ team: home, list: homeSquad }, { team: away, list: awaySquad }].map(({ team, list }) => (
                 <div key={team.id}>
                   <div className="text-xs font-semibold mb-1">{team.name}</div>
                   {list.map((p: any) => {
-                    const checked = scorers.includes(p.id);
+                    const n = counts[p.id] ?? 0;
                     return (
-                      <label key={p.id} className="flex items-center gap-2 text-xs py-0.5">
-                        <Checkbox
-                          checked={checked}
-                          onCheckedChange={(v) => {
-                            if (v) setScorers([...scorers, p.id]);
-                            else setScorers(scorers.filter((x) => x !== p.id));
-                          }}
-                        />
-                        {p.name}
-                      </label>
+                      <div key={p.id} className="flex items-center gap-1.5 text-xs py-0.5">
+                        <button
+                          type="button"
+                          onClick={() => bump(p.id, -1)}
+                          disabled={n === 0}
+                          className="h-5 w-5 rounded border border-input text-xs leading-none disabled:opacity-30"
+                          aria-label={`Decrease goals for ${p.name}`}
+                        >
+                          −
+                        </button>
+                        <span className={`w-4 text-center tabular-nums ${n > 0 ? "font-semibold text-primary" : "text-muted-foreground"}`}>
+                          {n}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => bump(p.id, +1)}
+                          className="h-5 w-5 rounded border border-input text-xs leading-none"
+                          aria-label={`Increase goals for ${p.name}`}
+                        >
+                          +
+                        </button>
+                        <span className="truncate">{p.name}</span>
+                      </div>
                     );
                   })}
                 </div>
               ))}
             </div>
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              Bump the counter to record multiple goals for the same player — the top-scorer
+              standings sum these counts.
+            </p>
           </div>
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
           <Button onClick={() => save.mutate()} disabled={save.isPending || (needsWinner && !winner)}>
-
             {save.isPending ? "Saving…" : "Save result"}
           </Button>
         </DialogFooter>

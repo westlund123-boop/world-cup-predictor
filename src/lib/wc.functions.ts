@@ -29,15 +29,26 @@ export const getMatches = createServerFn({ method: "GET" }).handler(async () => 
 
 export const getPlayers = createServerFn({ method: "GET" }).handler(async () => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data, error } = await supabaseAdmin
-    .from("players")
-    .select("id,team_id,name,name_on_shirt,position,shirt_number,club,active")
-    .eq("active", true)
-    .order("shirt_number", { ascending: true, nullsFirst: false })
-    .order("name")
-    .limit(5000);
-  if (error) throw new Error(error.message);
-  return data ?? [];
+  // Paginate to bypass PostgREST's per-request row cap (default 1000),
+  // which previously truncated the active-squads list and made some scorers
+  // missing from the admin Result dialog.
+  const PAGE = 1000;
+  const all: any[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabaseAdmin
+      .from("players")
+      .select("id,team_id,name,name_on_shirt,position,shirt_number,club,active")
+      .eq("active", true)
+      .order("team_id")
+      .order("shirt_number", { ascending: true, nullsFirst: false })
+      .order("name")
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(error.message);
+    if (!data || data.length === 0) break;
+    all.push(...data);
+    if (data.length < PAGE) break;
+  }
+  return all;
 });
 
 // ---------- Authenticated reads ----------
@@ -303,14 +314,24 @@ export const deleteWallMessage = createServerFn({ method: "POST" })
  */
 export const getTopScorerStandings = createServerFn({ method: "GET" }).handler(async () => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const [{ data: scorers, error: sErr }, { data: matches, error: mErr }, { data: players, error: pErr }] = await Promise.all([
+  const [{ data: scorers, error: sErr }, { data: matches, error: mErr }] = await Promise.all([
     supabaseAdmin.from("match_goalscorers").select("match_id,player_id"),
     supabaseAdmin.from("matches").select("id,status"),
-    supabaseAdmin.from("players").select("id,name,name_on_shirt,team_id,shirt_number,position").limit(5000),
   ]);
+  // Paginate players to avoid PostgREST row cap truncating squads.
+  const players: any[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error: pErr } = await supabaseAdmin
+      .from("players")
+      .select("id,name,name_on_shirt,team_id,shirt_number,position")
+      .range(from, from + 999);
+    if (pErr) throw new Error(pErr.message);
+    if (!data || data.length === 0) break;
+    players.push(...data);
+    if (data.length < 1000) break;
+  }
   if (sErr) throw new Error(sErr.message);
   if (mErr) throw new Error(mErr.message);
-  if (pErr) throw new Error(pErr.message);
 
   const finishedMatchIds = new Set((matches ?? []).filter((m) => m.status === "finished").map((m) => m.id));
   const counts = new Map<string, number>();
