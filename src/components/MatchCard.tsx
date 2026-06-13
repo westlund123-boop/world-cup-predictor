@@ -216,7 +216,7 @@ export function MatchCard({
           </div>
         )}
 
-        <MatchPreviewSection matchId={match.id} homeName={home.name} awayName={away.name} />
+        <MatchPreviewSection matchId={match.id} homeName={home.name} awayName={away.name} locked={locked} myOutcome={outcome} />
 
         {!locked && (
           <Button
