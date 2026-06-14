@@ -170,7 +170,7 @@ function Dashboard() {
         <div className="space-y-3">
           <SectionHeader title="Top players" linkTo="/leaderboard" linkLabel="Full leaderboard" />
           <Card className="divide-y divide-border overflow-hidden">
-            {leaderboard.slice(0, 5).map((r, i) => (
+            {leaderboard.slice(0, 5).map((r: any, i: number) => (
               <div key={r.user_id} className="flex items-center gap-3 px-4 py-3">
                 <span className="font-mono text-sm w-6 text-muted-foreground">#{i + 1}</span>
                 <div className="flex-1 min-w-0">
