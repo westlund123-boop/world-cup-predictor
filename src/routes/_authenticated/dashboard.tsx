@@ -3,9 +3,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useRef, useState, lazy, Suspense } from "react";
 import {
-  getMatches, getTeams, getMyPredictions, getLeaderboard, getMyProfile,
+  getMatches, getTeams, getMyPredictions, getMyProfile,
   getWallMessages, postWallMessage, deleteWallMessage,
 } from "@/lib/wc.functions";
+import { getCachedLeaderboard } from "@/lib/admin.functions";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -38,13 +39,13 @@ function Dashboard() {
   const mFn = useServerFn(getMatches);
   const tFn = useServerFn(getTeams);
   const pFn = useServerFn(getMyPredictions);
-  const lFn = useServerFn(getLeaderboard);
+  const lFn = useServerFn(getCachedLeaderboard);
   const meFn = useServerFn(getMyProfile);
 
   const { data: matches = [] } = useQuery({ queryKey: ["matches"], queryFn: () => mFn() });
   const { data: teams = [] } = useQuery({ queryKey: ["teams"], queryFn: () => tFn() });
   const { data: myPreds } = useQuery({ queryKey: ["myPredictions"], queryFn: () => pFn() });
-  const { data: leaderboard = [] } = useQuery({ queryKey: ["leaderboard"], queryFn: () => lFn() });
+  const { data: leaderboard = [] } = useQuery({ queryKey: ["leaderboard-cache"], queryFn: () => lFn() });
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: () => meFn() });
 
   const teamMap = new Map(teams.map((t) => [t.id, t]));
@@ -56,8 +57,8 @@ function Dashboard() {
   const openMatches = matches.filter((m) => matchStatus(m.kickoff_at, m.status) === "open");
   const openWithoutPred = openMatches.filter((m) => !predMap.has(m.id)).length;
 
-  const myRow = leaderboard.find((r) => r.user_id === me?.profile?.id);
-  const myRank = myRow ? leaderboard.findIndex((r) => r.user_id === myRow.user_id) + 1 : null;
+  const myRow = leaderboard.find((r: any) => r.user_id === me?.profile?.id);
+  const myRank = myRow ? leaderboard.findIndex((r: any) => r.user_id === myRow.user_id) + 1 : null;
 
   return (
     <div className="space-y-8">
@@ -169,7 +170,7 @@ function Dashboard() {
         <div className="space-y-3">
           <SectionHeader title="Top players" linkTo="/leaderboard" linkLabel="Full leaderboard" />
           <Card className="divide-y divide-border overflow-hidden">
-            {leaderboard.slice(0, 5).map((r, i) => (
+            {leaderboard.slice(0, 5).map((r: any, i: number) => (
               <div key={r.user_id} className="flex items-center gap-3 px-4 py-3">
                 <span className="font-mono text-sm w-6 text-muted-foreground">#{i + 1}</span>
                 <div className="flex-1 min-w-0">
