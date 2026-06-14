@@ -3,9 +3,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useRef, useState, lazy, Suspense } from "react";
 import {
-  getMatches, getTeams, getMyPredictions, getLeaderboard, getMyProfile,
+  getMatches, getTeams, getMyPredictions, getMyProfile,
   getWallMessages, postWallMessage, deleteWallMessage,
 } from "@/lib/wc.functions";
+import { getCachedLeaderboard } from "@/lib/admin.functions";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
