@@ -39,7 +39,7 @@ function Dashboard() {
   const mFn = useServerFn(getMatches);
   const tFn = useServerFn(getTeams);
   const pFn = useServerFn(getMyPredictions);
-  const lFn = useServerFn(getLeaderboard);
+  const lFn = useServerFn(getCachedLeaderboard);
   const meFn = useServerFn(getMyProfile);
 
   const { data: matches = [] } = useQuery({ queryKey: ["matches"], queryFn: () => mFn() });
