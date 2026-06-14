@@ -9,7 +9,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { upsertPrediction, getMyProfile } from "@/lib/wc.functions";
+import { upsertPrediction, getMyProfile, getMyMatchBreakdowns } from "@/lib/wc.functions";
 import { getMatchPreview, ensureMatchPreview, regenerateMatchPreview } from "@/lib/match-preview.functions";
 import { getMatchOdds, getMatchConsensus } from "@/lib/match-odds.functions";
 import { matchStatus, STAGE_LABEL, outcomeOf } from "@/lib/scoring";
@@ -78,6 +78,7 @@ export function MatchCard({
       toast.success("Prediction saved", { description: `${home.name} vs ${away.name}` });
       setDirty(false);
       qc.invalidateQueries({ queryKey: ["myPredictions"] });
+      qc.invalidateQueries({ queryKey: ["myBreakdowns"] });
       qc.invalidateQueries({ queryKey: ["leaderboard-cache"] });
     },
     onError: (e: Error) => toast.error("Could not save prediction", { description: e.message }),
@@ -212,10 +213,9 @@ export function MatchCard({
         </div>
 
         {status === "finished" && prediction && (
-          <div className="text-center py-2 rounded-md bg-accent text-accent-foreground font-semibold">
-            You earned {prediction.points} pts
-          </div>
+          <MatchBreakdown matchId={match.id} fallbackPoints={prediction.points} />
         )}
+
 
         <MatchPreviewSection matchId={match.id} homeName={home.name} awayName={away.name} locked={locked} myOutcome={outcome} />
 
@@ -234,6 +234,48 @@ export function MatchCard({
         )}
       </div>
     </Card>
+  );
+}
+
+function MatchBreakdown({ matchId, fallbackPoints }: { matchId: string; fallbackPoints: number }) {
+  const fn = useServerFn(getMyMatchBreakdowns);
+  const { data, isLoading } = useQuery({
+    queryKey: ["myBreakdowns"],
+    queryFn: () => fn(),
+    staleTime: 30_000,
+  });
+  const row = (data ?? []).find((r: any) => r.match_id === matchId);
+  const total = row?.total ?? fallbackPoints;
+
+  return (
+    <div className="rounded-md bg-accent/40 border border-border overflow-hidden">
+      <div className="px-3 py-2 flex items-center justify-between bg-accent text-accent-foreground">
+        <span className="text-sm font-semibold">Du fick {total} poäng</span>
+        <span className="text-xs text-muted-foreground uppercase tracking-wider">poäng-detaljer</span>
+      </div>
+      {isLoading && !row ? (
+        <div className="px-3 py-3 text-xs text-muted-foreground">Räknar ut poäng…</div>
+      ) : row ? (
+        <ul className="divide-y divide-border">
+          {row.parts.map((p: any) => (
+            <li key={p.key} className="px-3 py-2 flex items-start gap-2 text-xs">
+              {p.ok ? (
+                <Check className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
+              ) : (
+                <X className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="font-medium">{p.label}</div>
+                <div className="text-muted-foreground">{p.detail}</div>
+              </div>
+              <span className={`font-mono font-semibold ${p.ok ? "text-primary" : "text-muted-foreground"}`}>
+                {p.ok ? "+" : ""}{p.awarded}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   );
 }
 

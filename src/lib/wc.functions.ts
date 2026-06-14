@@ -70,6 +70,142 @@ export const getMyPredictions = createServerFn({ method: "GET" })
     return { predictions: preds ?? [], scorers: scorers ?? [] };
   });
 
+// Per-match scoring breakdown for the current user. Computed fresh from raw
+// data so the UI always reflects the same scoring path as the leaderboard
+// cache. Each row is independent: 1X2, exact/diff/total, first scorer, and
+// other scorer are scored separately — an incomplete exact score does NOT
+// void the 1X2 outcome points.
+export const getMyMatchBreakdowns = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const [{ data: preds }, { data: matches }, { data: predScorers }, { data: actualScorers }, { data: players }] =
+      await Promise.all([
+        supabase
+          .from("predictions")
+          .select("id,match_id,outcome,home_score,away_score,first_scorer_player_id")
+          .eq("user_id", userId),
+        supabaseAdmin
+          .from("matches")
+          .select("id,stage,status,home_score,away_score,home_team_id,away_team_id,winner_team_id"),
+        supabase.from("prediction_scorers").select("prediction_id,player_id"),
+        supabaseAdmin.from("match_goalscorers").select("match_id,player_id,is_first"),
+        supabaseAdmin.from("players").select("id,name,shirt_number"),
+      ]);
+
+    const matchById = new Map((matches ?? []).map((m: any) => [m.id, m]));
+    const playerById = new Map((players ?? []).map((p: any) => [p.id, p]));
+    const scorersByPred = new Map<string, string[]>();
+    for (const s of predScorers ?? []) {
+      const arr = scorersByPred.get(s.prediction_id) ?? [];
+      arr.push(s.player_id);
+      scorersByPred.set(s.prediction_id, arr);
+    }
+    const actualByMatch = new Map<string, { first: string | null; all: string[] }>();
+    for (const g of actualScorers ?? []) {
+      const e = actualByMatch.get(g.match_id) ?? { first: null, all: [] };
+      if (g.is_first) e.first = g.player_id;
+      e.all.push(g.player_id);
+      actualByMatch.set(g.match_id, e);
+    }
+
+    const playerLabel = (id: string | null | undefined) => {
+      if (!id) return null;
+      const p: any = playerById.get(id);
+      if (!p) return null;
+      return p.shirt_number != null ? `#${p.shirt_number} ${p.name}` : p.name;
+    };
+
+    type Part = { key: string; label: string; awarded: number; detail: string; ok: boolean };
+    const out: { match_id: string; total: number; parts: Part[] }[] = [];
+
+    for (const pred of (preds ?? []) as any[]) {
+      const m: any = matchById.get(pred.match_id);
+      if (!m || m.status !== "finished" || m.home_score == null || m.away_score == null) continue;
+
+      const parts: Part[] = [];
+
+      const actualOutcome =
+        m.home_score > m.away_score ? "1" : m.home_score < m.away_score ? "2" : "X";
+      const outcomeLabel = (o: string) =>
+        o === "1" ? "hemmavinst" : o === "2" ? "bortavinst" : "oavgjort";
+      const oneXTwoOk = pred.outcome === actualOutcome;
+      parts.push({
+        key: "1x2",
+        label: "1 / X / 2",
+        awarded: oneXTwoOk ? 5 : 0,
+        detail: oneXTwoOk
+          ? `Du tippade ${outcomeLabel(pred.outcome)} — rätt`
+          : `Du tippade ${outcomeLabel(pred.outcome)}, matchen slutade ${outcomeLabel(actualOutcome)}`,
+        ok: oneXTwoOk,
+      });
+
+      const hs = pred.home_score;
+      const as = pred.away_score;
+      const hasScore = typeof hs === "number" && typeof as === "number";
+      if (hasScore) {
+        const exact = hs === m.home_score && as === m.away_score;
+        const diffMatch = hs - as === m.home_score - m.away_score;
+        const totalMatch = hs + as === m.home_score + m.away_score;
+        if (exact) {
+          parts.push({ key: "exact", label: "Exakt slutresultat", awarded: 10,
+            detail: `Du tippade ${hs}–${as} — exakt rätt`, ok: true });
+        } else if (diffMatch) {
+          parts.push({ key: "diff", label: "Rätt målskillnad", awarded: 5,
+            detail: `Du tippade ${hs}–${as} (skillnad ${hs - as}), slutade ${m.home_score}–${m.away_score}`, ok: true });
+        } else if (totalMatch) {
+          parts.push({ key: "total", label: "Rätt antal mål", awarded: 5,
+            detail: `Du tippade ${hs}–${as} (${hs + as} mål totalt), slutade ${m.home_score}–${m.away_score}`, ok: true });
+        } else {
+          parts.push({ key: "exact", label: "Exakt / målskillnad / totalt", awarded: 0,
+            detail: `Du tippade ${hs}–${as}, slutade ${m.home_score}–${m.away_score}`, ok: false });
+        }
+      } else {
+        parts.push({ key: "exact", label: "Exakt slutresultat", awarded: 0,
+          detail: "Ingen fullständig resultat-tippning", ok: false });
+      }
+
+      const actualFirst = actualByMatch.get(m.id)?.first ?? null;
+      const predFirst = pred.first_scorer_player_id;
+      const firstOk = !!predFirst && !!actualFirst && predFirst === actualFirst;
+      parts.push({
+        key: "first",
+        label: "Första målskytt",
+        awarded: firstOk ? 10 : 0,
+        detail: !predFirst
+          ? "Du tippade ingen första målskytt"
+          : firstOk
+          ? `Du tippade ${playerLabel(predFirst)} — rätt`
+          : `Du tippade ${playerLabel(predFirst)}, första målskytten var ${playerLabel(actualFirst) ?? "okänd"}`,
+        ok: firstOk,
+      });
+
+      const predScorerIds = (scorersByPred.get(pred.id) ?? []).filter((id) => id !== predFirst);
+      const actualSet = new Set(actualByMatch.get(m.id)?.all ?? []);
+      const otherPick = predScorerIds[0] ?? null;
+      const otherOk = !!otherPick && actualSet.has(otherPick);
+      parts.push({
+        key: "other",
+        label: "Annan målskytt",
+        awarded: otherOk ? 5 : 0,
+        detail: !otherPick
+          ? "Du tippade ingen annan målskytt"
+          : otherOk
+          ? `${playerLabel(otherPick)} gjorde mål — rätt`
+          : `Du tippade ${playerLabel(otherPick)}, gjorde inte mål`,
+        ok: otherOk,
+      });
+
+      const total = parts.reduce((s, p) => s + p.awarded, 0);
+      out.push({ match_id: pred.match_id, total, parts });
+    }
+    return out;
+  });
+
+
+
 
 export const getMyTop3 = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
