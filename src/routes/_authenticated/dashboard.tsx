@@ -45,7 +45,7 @@ function Dashboard() {
   const { data: matches = [] } = useQuery({ queryKey: ["matches"], queryFn: () => mFn() });
   const { data: teams = [] } = useQuery({ queryKey: ["teams"], queryFn: () => tFn() });
   const { data: myPreds } = useQuery({ queryKey: ["myPredictions"], queryFn: () => pFn() });
-  const { data: leaderboard = [] } = useQuery({ queryKey: ["leaderboard"], queryFn: () => lFn() });
+  const { data: leaderboard = [] } = useQuery({ queryKey: ["leaderboard-cache"], queryFn: () => lFn() });
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: () => meFn() });
 
   const teamMap = new Map(teams.map((t) => [t.id, t]));
