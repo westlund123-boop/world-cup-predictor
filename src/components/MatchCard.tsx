@@ -212,10 +212,9 @@ export function MatchCard({
         </div>
 
         {status === "finished" && prediction && (
-          <div className="text-center py-2 rounded-md bg-accent text-accent-foreground font-semibold">
-            You earned {prediction.points} pts
-          </div>
+          <MatchBreakdown matchId={match.id} fallbackPoints={prediction.points} />
         )}
+
 
         <MatchPreviewSection matchId={match.id} homeName={home.name} awayName={away.name} locked={locked} myOutcome={outcome} />
 
