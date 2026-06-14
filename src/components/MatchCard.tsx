@@ -9,7 +9,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { upsertPrediction, getMyProfile } from "@/lib/wc.functions";
+import { upsertPrediction, getMyProfile, getMyMatchBreakdowns } from "@/lib/wc.functions";
 import { getMatchPreview, ensureMatchPreview, regenerateMatchPreview } from "@/lib/match-preview.functions";
 import { getMatchOdds, getMatchConsensus } from "@/lib/match-odds.functions";
 import { matchStatus, STAGE_LABEL, outcomeOf } from "@/lib/scoring";
