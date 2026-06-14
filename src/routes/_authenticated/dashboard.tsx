@@ -57,8 +57,8 @@ function Dashboard() {
   const openMatches = matches.filter((m) => matchStatus(m.kickoff_at, m.status) === "open");
   const openWithoutPred = openMatches.filter((m) => !predMap.has(m.id)).length;
 
-  const myRow = leaderboard.find((r) => r.user_id === me?.profile?.id);
-  const myRank = myRow ? leaderboard.findIndex((r) => r.user_id === myRow.user_id) + 1 : null;
+  const myRow = leaderboard.find((r: any) => r.user_id === me?.profile?.id);
+  const myRank = myRow ? leaderboard.findIndex((r: any) => r.user_id === myRow.user_id) + 1 : null;
 
   return (
     <div className="space-y-8">
