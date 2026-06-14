@@ -236,6 +236,48 @@ export function MatchCard({
   );
 }
 
+function MatchBreakdown({ matchId, fallbackPoints }: { matchId: string; fallbackPoints: number }) {
+  const fn = useServerFn(getMyMatchBreakdowns);
+  const { data, isLoading } = useQuery({
+    queryKey: ["myBreakdowns"],
+    queryFn: () => fn(),
+    staleTime: 30_000,
+  });
+  const row = (data ?? []).find((r: any) => r.match_id === matchId);
+  const total = row?.total ?? fallbackPoints;
+
+  return (
+    <div className="rounded-md bg-accent/40 border border-border overflow-hidden">
+      <div className="px-3 py-2 flex items-center justify-between bg-accent text-accent-foreground">
+        <span className="text-sm font-semibold">Du fick {total} poäng</span>
+        <span className="text-xs text-muted-foreground uppercase tracking-wider">poäng-detaljer</span>
+      </div>
+      {isLoading && !row ? (
+        <div className="px-3 py-3 text-xs text-muted-foreground">Räknar ut poäng…</div>
+      ) : row ? (
+        <ul className="divide-y divide-border">
+          {row.parts.map((p: any) => (
+            <li key={p.key} className="px-3 py-2 flex items-start gap-2 text-xs">
+              {p.ok ? (
+                <Check className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
+              ) : (
+                <X className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="font-medium">{p.label}</div>
+                <div className="text-muted-foreground">{p.detail}</div>
+              </div>
+              <span className={`font-mono font-semibold ${p.ok ? "text-primary" : "text-muted-foreground"}`}>
+                {p.ok ? "+" : ""}{p.awarded}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
 function MatchPreviewSection({ matchId, homeName, awayName, locked, myOutcome }: { matchId: string; homeName: string; awayName: string; locked: boolean; myOutcome: "1" | "X" | "2" | null }) {
   const [open, setOpen] = useState(false);
   const qc = useQueryClient();
