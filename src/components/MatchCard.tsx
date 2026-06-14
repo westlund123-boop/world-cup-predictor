@@ -78,6 +78,7 @@ export function MatchCard({
       toast.success("Prediction saved", { description: `${home.name} vs ${away.name}` });
       setDirty(false);
       qc.invalidateQueries({ queryKey: ["myPredictions"] });
+      qc.invalidateQueries({ queryKey: ["myBreakdowns"] });
       qc.invalidateQueries({ queryKey: ["leaderboard-cache"] });
     },
     onError: (e: Error) => toast.error("Could not save prediction", { description: e.message }),
