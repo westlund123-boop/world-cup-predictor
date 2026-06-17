@@ -510,7 +510,7 @@ export const getMyTopScorerLeague = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
-    const [{ data: parent }, { data: picks }] = await Promise.all([
+    const [{ data: parent }, { data: picks }, { data: unlock }] = await Promise.all([
       supabase
         .from("top_scorer_predictions")
         .select("user_id,submitted_at,points")
@@ -521,8 +521,13 @@ export const getMyTopScorerLeague = createServerFn({ method: "GET" })
         .select("rank,player_id")
         .eq("user_id", userId)
         .order("rank"),
+      supabase
+        .from("top_scorer_unlocks")
+        .select("user_id")
+        .eq("user_id", userId)
+        .maybeSingle(),
     ]);
-    return { parent: parent ?? null, picks: picks ?? [] };
+    return { parent: parent ?? null, picks: picks ?? [], hasUnlock: !!unlock };
   });
 
 const TopScorerLeagueInput = z.object({
