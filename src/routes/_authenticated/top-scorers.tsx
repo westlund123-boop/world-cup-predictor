@@ -174,6 +174,15 @@ function TopScorersPage() {
         </Card>
       )}
 
+      {tournamentStarted && hasUnlock && (
+        <Card className="p-4 flex items-center gap-3 border-primary/30 bg-primary/5">
+          <Unlock className="h-4 w-4 text-primary" />
+          <span className="text-sm">
+            An admin has temporarily unlocked your Top Scorer League. Submit your top 10 to lock it back in.
+          </span>
+        </Card>
+      )}
+
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Your ranked picks */}
         <Card className="p-6 space-y-4">
