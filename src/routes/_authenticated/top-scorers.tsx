@@ -314,6 +314,8 @@ function TopScorersPage() {
           rank. Each predicted player counts once.
         </p>
       </Card>
+
+      {isAdmin && <AdminUnlockPanel />}
     </div>
   );
 }
