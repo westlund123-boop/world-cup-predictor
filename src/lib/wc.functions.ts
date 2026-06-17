@@ -590,5 +590,10 @@ export const upsertTopScorerLeague = createServerFn({ method: "POST" })
     const { error: insErr } = await supabase.from("top_scorer_prediction_picks").insert(rows);
     if (insErr) throw new Error(insErr.message);
 
+    // Consume one-shot unlock if present so the lock re-engages.
+    if (unlock) {
+      await supabase.from("top_scorer_unlocks").delete().eq("user_id", userId);
+    }
+
     return { ok: true };
   });
