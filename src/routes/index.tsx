@@ -23,6 +23,9 @@ function Landing() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -43,6 +46,21 @@ function Landing() {
     else {
       toast.success("Signed in");
       navigate({ to: "/dashboard", replace: true });
+    }
+  };
+
+  const sendReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setForgotLoading(false);
+    if (error) toast.error(error.message);
+    else {
+      toast.success("Password reset email sent. Check your inbox.");
+      setForgotOpen(false);
+      setForgotEmail("");
     }
   };
 
@@ -94,13 +112,46 @@ function Landing() {
               <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                <button
+                  type="button"
+                  onClick={() => { setForgotEmail(email); setForgotOpen((v) => !v); }}
+                  className="text-xs text-primary font-medium hover:underline"
+                >
+                  Forgot password?
+                </button>
+              </div>
               <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
             <Button type="submit" disabled={loading} className="w-full">
               {loading ? "Signing in…" : "Sign in"}
             </Button>
           </form>
+          {forgotOpen && (
+            <form onSubmit={sendReset} className="mt-4 space-y-3 rounded-md border border-border p-4 bg-muted/30">
+              <div className="space-y-1">
+                <Label htmlFor="forgot-email" className="text-sm">Reset password</Label>
+                <p className="text-xs text-muted-foreground">Enter your email and we'll send you a link to set a new password.</p>
+              </div>
+              <Input
+                id="forgot-email"
+                type="email"
+                required
+                value={forgotEmail}
+                onChange={(e) => setForgotEmail(e.target.value)}
+                placeholder="you@company.com"
+              />
+              <div className="flex gap-2">
+                <Button type="submit" disabled={forgotLoading} className="flex-1">
+                  {forgotLoading ? "Sending…" : "Send reset link"}
+                </Button>
+                <Button type="button" variant="ghost" onClick={() => setForgotOpen(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          )}
           <p className="text-sm text-muted-foreground mt-6 text-center">
             New here?{" "}
             <Link to="/auth" className="text-primary font-medium hover:underline">
