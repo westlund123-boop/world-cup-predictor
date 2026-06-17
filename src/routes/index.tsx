@@ -23,6 +23,9 @@ function Landing() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -43,6 +46,21 @@ function Landing() {
     else {
       toast.success("Signed in");
       navigate({ to: "/dashboard", replace: true });
+    }
+  };
+
+  const sendReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setForgotLoading(false);
+    if (error) toast.error(error.message);
+    else {
+      toast.success("Password reset email sent. Check your inbox.");
+      setForgotOpen(false);
+      setForgotEmail("");
     }
   };
 
