@@ -9,14 +9,20 @@ import {
   getMyTopScorerLeague,
   upsertTopScorerLeague,
   getTopScorerStandings,
+  getMyProfile,
 } from "@/lib/wc.functions";
+import {
+  adminListTopScorerEntries,
+  adminGrantTopScorerUnlock,
+  adminRevokeTopScorerUnlock,
+} from "@/lib/admin.functions";
 import { scoreTopScorerLeague } from "@/lib/scoring";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { ListOrdered, Lock, Trophy } from "lucide-react";
+import { ListOrdered, Lock, Trophy, Unlock, ShieldCheck } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/top-scorers")({
   head: () => ({ meta: [{ title: "Top Scorer League — WC 2026 Predictor" }] }),
