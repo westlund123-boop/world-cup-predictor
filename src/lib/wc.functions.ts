@@ -542,14 +542,22 @@ export const upsertTopScorerLeague = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
-    // Lock if the tournament has started (any match has kicked off).
-    const { data: started } = await supabase
-      .from("matches")
-      .select("kickoff_at")
-      .order("kickoff_at")
-      .limit(1);
-    if (started && started.length > 0 && new Date(started[0].kickoff_at) <= new Date()) {
-      throw new Error("Top Scorer League predictions are locked — the tournament has started");
+    // Lock if the tournament has started (any match has kicked off),
+    // unless an admin has granted this user an unlock.
+    const { data: unlock } = await supabase
+      .from("top_scorer_unlocks")
+      .select("user_id")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (!unlock) {
+      const { data: started } = await supabase
+        .from("matches")
+        .select("kickoff_at")
+        .order("kickoff_at")
+        .limit(1);
+      if (started && started.length > 0 && new Date(started[0].kickoff_at) <= new Date()) {
+        throw new Error("Top Scorer League predictions are locked — the tournament has started");
+      }
     }
 
     // Validate: 10 distinct players, ranks 1..10 exactly once
