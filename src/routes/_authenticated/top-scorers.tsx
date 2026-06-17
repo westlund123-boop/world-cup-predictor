@@ -45,15 +45,20 @@ function TopScorersPage() {
   const myFn = useServerFn(getMyTopScorerLeague);
   const saveFn = useServerFn(upsertTopScorerLeague);
   const standingsFn = useServerFn(getTopScorerStandings);
+  const meFn = useServerFn(getMyProfile);
 
   const { data: players = [] } = useQuery({ queryKey: ["players"], queryFn: () => playersFn() });
   const { data: teams = [] } = useQuery({ queryKey: ["teams"], queryFn: () => teamsFn() });
   const { data: matches = [] } = useQuery({ queryKey: ["matches"], queryFn: () => matchesFn() });
   const { data: my } = useQuery({ queryKey: ["myTopScorerLeague"], queryFn: () => myFn() });
+  const { data: me } = useQuery({ queryKey: ["me"], queryFn: () => meFn() });
   const { data: standings = [] } = useQuery({
     queryKey: ["topScorerStandings"],
     queryFn: () => standingsFn(),
   });
+
+  const isAdmin = !!me?.isAdmin;
+  const hasUnlock = !!my?.hasUnlock;
 
   const teamById = useMemo(
     () => new Map(teams.map((t) => [t.id, t])),
@@ -73,7 +78,8 @@ function TopScorersPage() {
     () => [...matches].sort((a, b) => new Date(a.kickoff_at).getTime() - new Date(b.kickoff_at).getTime())[0],
     [matches]
   );
-  const locked = !!firstMatch && new Date(firstMatch.kickoff_at) <= new Date();
+  const tournamentStarted = !!firstMatch && new Date(firstMatch.kickoff_at) <= new Date();
+  const locked = tournamentStarted && !hasUnlock;
 
   const [picks, setPicks] = useState<(string | null)[]>(() => new Array(10).fill(null));
   const [filter, setFilter] = useState("");
