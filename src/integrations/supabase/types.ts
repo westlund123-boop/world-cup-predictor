@@ -532,6 +532,24 @@ export type Database = {
         }
         Relationships: []
       }
+      top_scorer_unlocks: {
+        Row: {
+          granted_at: string
+          granted_by: string | null
+          user_id: string
+        }
+        Insert: {
+          granted_at?: string
+          granted_by?: string | null
+          user_id: string
+        }
+        Update: {
+          granted_at?: string
+          granted_by?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       top3_predictions: {
         Row: {
           points: number

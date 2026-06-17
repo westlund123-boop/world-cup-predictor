@@ -9,14 +9,20 @@ import {
   getMyTopScorerLeague,
   upsertTopScorerLeague,
   getTopScorerStandings,
+  getMyProfile,
 } from "@/lib/wc.functions";
+import {
+  adminListTopScorerEntries,
+  adminGrantTopScorerUnlock,
+  adminRevokeTopScorerUnlock,
+} from "@/lib/admin.functions";
 import { scoreTopScorerLeague } from "@/lib/scoring";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { ListOrdered, Lock, Trophy } from "lucide-react";
+import { ListOrdered, Lock, Trophy, Unlock, ShieldCheck } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/top-scorers")({
   head: () => ({ meta: [{ title: "Top Scorer League — WC 2026 Predictor" }] }),
@@ -39,15 +45,20 @@ function TopScorersPage() {
   const myFn = useServerFn(getMyTopScorerLeague);
   const saveFn = useServerFn(upsertTopScorerLeague);
   const standingsFn = useServerFn(getTopScorerStandings);
+  const meFn = useServerFn(getMyProfile);
 
   const { data: players = [] } = useQuery({ queryKey: ["players"], queryFn: () => playersFn() });
   const { data: teams = [] } = useQuery({ queryKey: ["teams"], queryFn: () => teamsFn() });
   const { data: matches = [] } = useQuery({ queryKey: ["matches"], queryFn: () => matchesFn() });
   const { data: my } = useQuery({ queryKey: ["myTopScorerLeague"], queryFn: () => myFn() });
+  const { data: me } = useQuery({ queryKey: ["me"], queryFn: () => meFn() });
   const { data: standings = [] } = useQuery({
     queryKey: ["topScorerStandings"],
     queryFn: () => standingsFn(),
   });
+
+  const isAdmin = !!me?.isAdmin;
+  const hasUnlock = !!my?.hasUnlock;
 
   const teamById = useMemo(
     () => new Map(teams.map((t) => [t.id, t])),
@@ -67,7 +78,8 @@ function TopScorersPage() {
     () => [...matches].sort((a, b) => new Date(a.kickoff_at).getTime() - new Date(b.kickoff_at).getTime())[0],
     [matches]
   );
-  const locked = !!firstMatch && new Date(firstMatch.kickoff_at) <= new Date();
+  const tournamentStarted = !!firstMatch && new Date(firstMatch.kickoff_at) <= new Date();
+  const locked = tournamentStarted && !hasUnlock;
 
   const [picks, setPicks] = useState<(string | null)[]>(() => new Array(10).fill(null));
   const [filter, setFilter] = useState("");
@@ -159,6 +171,15 @@ function TopScorersPage() {
         <Card className="p-4 flex items-center gap-3 border-destructive/30 bg-destructive/5">
           <Lock className="h-4 w-4 text-destructive" />
           <span className="text-sm">Top Scorer League predictions are locked — the tournament has started.</span>
+        </Card>
+      )}
+
+      {tournamentStarted && hasUnlock && (
+        <Card className="p-4 flex items-center gap-3 border-primary/30 bg-primary/5">
+          <Unlock className="h-4 w-4 text-primary" />
+          <span className="text-sm">
+            An admin has temporarily unlocked your Top Scorer League. Submit your top 10 to lock it back in.
+          </span>
         </Card>
       )}
 
@@ -293,6 +314,126 @@ function TopScorersPage() {
           rank. Each predicted player counts once.
         </p>
       </Card>
+
+      {isAdmin && <AdminUnlockPanel />}
     </div>
+  );
+}
+
+function AdminUnlockPanel() {
+  const listFn = useServerFn(adminListTopScorerEntries);
+  const grantFn = useServerFn(adminGrantTopScorerUnlock);
+  const revokeFn = useServerFn(adminRevokeTopScorerUnlock);
+  const qc = useQueryClient();
+
+  const { data: entries = [], isLoading } = useQuery({
+    queryKey: ["adminTopScorerEntries"],
+    queryFn: () => listFn(),
+  });
+  const [selected, setSelected] = useState("");
+  const [filter, setFilter] = useState("");
+
+  const grant = useMutation({
+    mutationFn: (user_id: string) => grantFn({ data: { user_id } }),
+    onSuccess: () => {
+      toast.success("Unlock granted. The user can now resubmit their top 10.");
+      qc.invalidateQueries({ queryKey: ["adminTopScorerEntries"] });
+      qc.invalidateQueries({ queryKey: ["myTopScorerLeague"] });
+      setSelected("");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const revoke = useMutation({
+    mutationFn: (user_id: string) => revokeFn({ data: { user_id } }),
+    onSuccess: () => {
+      toast.success("Unlock revoked.");
+      qc.invalidateQueries({ queryKey: ["adminTopScorerEntries"] });
+      qc.invalidateQueries({ queryKey: ["myTopScorerLeague"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const filtered = useMemo(() => {
+    const f = filter.trim().toLowerCase();
+    if (!f) return entries;
+    return entries.filter(
+      (e: any) =>
+        e.name?.toLowerCase().includes(f) ||
+        e.email?.toLowerCase().includes(f) ||
+        e.department?.toLowerCase().includes(f),
+    );
+  }, [entries, filter]);
+
+  const activeUnlocks = entries.filter((e: any) => e.has_unlock);
+
+  return (
+    <Card className="p-6 space-y-4 border-primary/30">
+      <div className="flex items-center gap-2">
+        <ShieldCheck className="h-4 w-4 text-primary" />
+        <h2 className="font-semibold">Admin · Unlock a user's Top Scorer League</h2>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Granting an unlock lets the selected user re-submit their top 10 once, even after the
+        tournament has started. The unlock is consumed automatically when they save.
+      </p>
+
+      {activeUnlocks.length > 0 && (
+        <div className="space-y-1">
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+            Active unlocks
+          </Label>
+          <ul className="divide-y divide-border rounded-md border">
+            {activeUnlocks.map((u: any) => (
+              <li key={u.user_id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                <div>
+                  <div className="font-medium">{u.name || u.email || u.user_id}</div>
+                  <div className="text-xs text-muted-foreground">{u.email} · {u.pick_count} picks</div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => revoke.mutate(u.user_id)}
+                  disabled={revoke.isPending}
+                >
+                  Revoke
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+          Grant a new unlock
+        </Label>
+        <Input
+          placeholder="Filter by name, email or department…"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        />
+        <select
+          value={selected}
+          onChange={(e) => setSelected(e.target.value)}
+          className="w-full h-9 px-2 rounded-md border border-input bg-background text-sm"
+        >
+          <option value="">{isLoading ? "Loading users…" : "Pick a user…"}</option>
+          {filtered.map((e: any) => (
+            <option key={e.user_id} value={e.user_id}>
+              {e.name || e.email || e.user_id} {e.email ? `· ${e.email}` : ""} · {e.pick_count} picks
+              {e.has_unlock ? " · already unlocked" : ""}
+            </option>
+          ))}
+        </select>
+        <Button
+          onClick={() => grant.mutate(selected)}
+          disabled={!selected || grant.isPending}
+          className="w-full"
+        >
+          <Unlock className="h-4 w-4 mr-2" />
+          {grant.isPending ? "Granting…" : "Grant unlock"}
+        </Button>
+      </div>
+    </Card>
   );
 }

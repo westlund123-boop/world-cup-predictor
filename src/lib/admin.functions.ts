@@ -821,3 +821,61 @@ export const adminExportPlayersCSV = createServerFn({ method: "POST" })
     }
     return { csv: lines.join("\n"), filename: `squads-${new Date().toISOString().slice(0, 10)}.csv` };
   });
+
+// ---------- Admin: Top Scorer League unlock ----------
+
+export const adminListTopScorerEntries = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const [{ data: profiles }, { data: users }, { data: unlocks }, { data: picks }] =
+      await Promise.all([
+        supabaseAdmin.from("profiles").select("id,name,department"),
+        supabaseAdmin.auth.admin.listUsers({ perPage: 1000 }),
+        supabaseAdmin.from("top_scorer_unlocks").select("user_id,granted_at"),
+        supabaseAdmin.from("top_scorer_prediction_picks").select("user_id"),
+      ]);
+    const emailMap = new Map<string, string>();
+    for (const u of users?.users ?? []) emailMap.set(u.id, u.email ?? "");
+    const unlockSet = new Set((unlocks ?? []).map((u) => u.user_id));
+    const pickCounts = new Map<string, number>();
+    for (const p of picks ?? []) pickCounts.set(p.user_id, (pickCounts.get(p.user_id) ?? 0) + 1);
+    return (profiles ?? [])
+      .map((p) => ({
+        user_id: p.id,
+        name: p.name ?? "",
+        department: p.department ?? "",
+        email: emailMap.get(p.id) ?? "",
+        pick_count: pickCounts.get(p.id) ?? 0,
+        has_unlock: unlockSet.has(p.id),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  });
+
+export const adminGrantTopScorerUnlock = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ user_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("top_scorer_unlocks")
+      .upsert({ user_id: data.user_id, granted_by: context.userId, granted_at: new Date().toISOString() });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const adminRevokeTopScorerUnlock = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ user_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("top_scorer_unlocks")
+      .delete()
+      .eq("user_id", data.user_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
