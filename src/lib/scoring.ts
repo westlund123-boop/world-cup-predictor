@@ -54,33 +54,46 @@ export function scoreMatchPrediction(
 }
 
 /**
- * Goalscorer points (max 15 per match):
- *  - +10 if first_scorer matches the actual first scorer
- *  - +5 if the (single) other-scorer pick appears in the actual scorers
- * Rule change: users may only pick ONE other goalscorer. If older data has
- * more than one row stored, only the first matching pick is awarded.
+ * Goalscorer points (NO cap — every actual goal by a predicted player counts):
+ *  - First-scorer pick: if your predicted first scorer was actually the first
+ *    scorer, award 10 for the first goal + 5 for every additional goal the
+ *    same player scored in the match. If he wasn't actually first → 0.
+ *  - Other-scorer pick (single player, must differ from the first-scorer pick):
+ *    award 5 × (goals scored by that player in the match). 0 if he didn't score.
+ *  - A single predicted player's goals are counted in exactly one bucket
+ *    (the first-scorer bucket if predicted there, otherwise the other-scorer
+ *    bucket) — never both.
+ *
+ * `actual.scorer_player_ids` is the per-goal list (one entry per goal, so
+ * duplicates encode multiple goals by the same player).
  */
 export function scoreGoalscorers(
   pred: { first_scorer_player_id: string | null; scorer_ids: string[] },
   actual: { first_scorer_player_id: string | null; scorer_player_ids: string[] }
 ): number {
-  let pts = 0;
-  if (
-    pred.first_scorer_player_id &&
-    actual.first_scorer_player_id &&
-    pred.first_scorer_player_id === actual.first_scorer_player_id
-  ) {
-    pts += 10;
+  const counts = new Map<string, number>();
+  for (const pid of actual.scorer_player_ids) {
+    counts.set(pid, (counts.get(pid) ?? 0) + 1);
   }
-  const actualSet = new Set(actual.scorer_player_ids);
+  let pts = 0;
+  const predFirst = pred.first_scorer_player_id;
+  if (
+    predFirst &&
+    actual.first_scorer_player_id &&
+    predFirst === actual.first_scorer_player_id
+  ) {
+    const n = counts.get(predFirst) ?? 1;
+    pts += 10 + 5 * Math.max(0, n - 1);
+  }
   for (const pid of pred.scorer_ids) {
-    if (pid === pred.first_scorer_player_id) continue;
-    if (actualSet.has(pid)) {
-      pts += 5;
-      break; // award at most ONE other-scorer bonus per match
+    if (pid === predFirst) continue;
+    const n = counts.get(pid) ?? 0;
+    if (n > 0) {
+      pts += 5 * n;
+      break;
     }
   }
-  return Math.min(pts, 15);
+  return pts;
 }
 
 
