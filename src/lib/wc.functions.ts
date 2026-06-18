@@ -167,33 +167,42 @@ export const getMyMatchBreakdowns = createServerFn({ method: "GET" })
           detail: "Ingen fullständig resultat-tippning", ok: false });
       }
 
-      const actualFirst = actualByMatch.get(m.id)?.first ?? null;
+      const actualEntry = actualByMatch.get(m.id);
+      const actualFirst = actualEntry?.first ?? null;
+      const actualAll = actualEntry?.all ?? [];
+      const goalCounts = new Map<string, number>();
+      for (const pid of actualAll) goalCounts.set(pid, (goalCounts.get(pid) ?? 0) + 1);
+
       const predFirst = pred.first_scorer_player_id;
       const firstOk = !!predFirst && !!actualFirst && predFirst === actualFirst;
+      const firstGoals = firstOk ? (goalCounts.get(predFirst!) ?? 1) : 0;
+      const firstAwarded = firstOk ? 10 + 5 * Math.max(0, firstGoals - 1) : 0;
       parts.push({
         key: "first",
         label: "Första målskytt",
-        awarded: firstOk ? 10 : 0,
+        awarded: firstAwarded,
         detail: !predFirst
           ? "Du tippade ingen första målskytt"
           : firstOk
-          ? `Du tippade ${playerLabel(predFirst)} — rätt`
+          ? firstGoals > 1
+            ? `Du tippade ${playerLabel(predFirst)} — rätt (gjorde ${firstGoals} mål: 10 + ${firstGoals - 1}×5)`
+            : `Du tippade ${playerLabel(predFirst)} — rätt`
           : `Du tippade ${playerLabel(predFirst)}, första målskytten var ${playerLabel(actualFirst) ?? "okänd"}`,
         ok: firstOk,
       });
 
       const predScorerIds = (scorersByPred.get(pred.id) ?? []).filter((id) => id !== predFirst);
-      const actualSet = new Set(actualByMatch.get(m.id)?.all ?? []);
       const otherPick = predScorerIds[0] ?? null;
-      const otherOk = !!otherPick && actualSet.has(otherPick);
+      const otherGoals = otherPick ? (goalCounts.get(otherPick) ?? 0) : 0;
+      const otherOk = otherGoals > 0;
       parts.push({
         key: "other",
         label: "Annan målskytt",
-        awarded: otherOk ? 5 : 0,
+        awarded: otherOk ? 5 * otherGoals : 0,
         detail: !otherPick
           ? "Du tippade ingen annan målskytt"
           : otherOk
-          ? `${playerLabel(otherPick)} gjorde mål — rätt`
+          ? `${playerLabel(otherPick)} gjorde ${otherGoals} mål — ${otherGoals}×5`
           : `Du tippade ${playerLabel(otherPick)}, gjorde inte mål`,
         ok: otherOk,
       });
